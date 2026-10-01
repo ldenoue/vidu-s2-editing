@@ -1,0 +1,2729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Editing Stream Demo</title>
+    <script src="https://g.alicdn.com/apsara-media-box/imp-web-rtc/7.1.9/aliyun-rtc-sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu@4.22.0/dist/tf-backend-webgpu.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-segmentation@1.0.2/dist/body-segmentation.min.js" crossorigin="anonymous"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700&family=Sora:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef1f7;
+        --panel: #ffffff;
+        --panel-hi: #f7f9fc;
+        --border: #dfe5ee;
+        --border-soft: #e8edf5;
+        --text: #111a2c;
+        --muted: #64748b;
+        --accent: #0d9488;
+        --accent-2: #0284c7;
+        --accent-ink: #ffffff;
+        --ok: #0e9f6e;
+        --ok-bg: rgba(14, 159, 110, 0.09);
+        --warn: #b45309;
+        --warn-bg: rgba(217, 119, 6, 0.1);
+        --err: #dc2626;
+        --err-bg: rgba(220, 38, 38, 0.08);
+        --font-ui: "Sora", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --font-mono: "IBM Plex Mono", "Noto Sans SC", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: #c2cbda transparent;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(1100px 520px at 85% -10%, rgba(13, 148, 136, 0.1), transparent 60%),
+          radial-gradient(900px 520px at -10% 25%, rgba(2, 132, 199, 0.08), transparent 55%),
+          var(--bg);
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: 14px;
+        overflow-x: hidden;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
+        background-size: 44px 44px;
+        mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 75%);
+        -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 75%);
+      }
+
+      ::selection {
+        background: rgba(13, 148, 136, 0.22);
+      }
+
+      main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 26px 24px 48px;
+        box-sizing: border-box;
+        position: relative;
+      }
+
+      main > * {
+        animation: rise 0.55s cubic-bezier(0.22, 0.8, 0.32, 1) both;
+      }
+
+      main > *:nth-child(2) { animation-delay: 0.06s; }
+      main > *:nth-child(3) { animation-delay: 0.1s; }
+      main > *:nth-child(4) { animation-delay: 0.16s; }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      h1 {
+        margin: 14px 0 8px;
+        font-family: var(--font-ui);
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      h1::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--err);
+        box-shadow: 0 0 12px rgba(248, 113, 113, 0.9);
+        flex: none;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+
+      h2 {
+        font-family: var(--font-ui);
+        letter-spacing: -0.01em;
+      }
+
+      strong {
+        font-family: var(--font-ui);
+        font-size: 13px;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
+
+      .hint {
+        margin: 0 0 22px;
+        color: var(--muted);
+        line-height: 1.7;
+        font-size: 13px;
+        max-width: 76ch;
+      }
+
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+        background: #ecf8f6;
+        border: 1px solid #c9e8e4;
+        border-radius: 5px;
+        padding: 1px 6px;
+        color: #0f766e;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(340px, 396px) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      .card {
+        position: relative;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: linear-gradient(180deg, var(--panel-hi) 0%, var(--panel) 55%);
+        padding: 20px;
+        box-shadow:
+          0 20px 40px -24px rgba(16, 24, 40, 0.22),
+          0 1px 3px rgba(16, 24, 40, 0.05);
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 8%;
+        right: 8%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(13, 148, 136, 0.35), transparent);
+        pointer-events: none;
+      }
+
+      label {
+        display: block;
+        margin: 16px 0 7px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .toolbar {
+        align-items: center;
+        gap: 10px;
+        padding: 6px 12px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+      }
+
+      .toolbar label {
+        margin: 0;
+      }
+
+      .toolbar select {
+        background: transparent;
+        border-color: transparent;
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--accent);
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        padding: 10px 12px;
+        font: inherit;
+        font-size: 13px;
+        background: #f8fafc;
+        color: var(--text);
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+      }
+
+      select {
+        cursor: pointer;
+      }
+
+      input::placeholder {
+        color: #97a3b7;
+      }
+
+      input:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible {
+        outline: none;
+        border-color: var(--accent);
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.14);
+      }
+
+      button {
+        cursor: pointer;
+        border-color: transparent;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: var(--accent-ink);
+        font-family: var(--font-ui);
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        box-shadow: 0 8px 20px -10px rgba(13, 148, 136, 0.55);
+      }
+
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+      }
+
+      button:active:not(:disabled) {
+        transform: translateY(0) scale(0.99);
+        filter: brightness(0.96);
+      }
+
+      button.secondary {
+        border-color: #cbd5e1;
+        background: #ffffff;
+        color: var(--text);
+        box-shadow: none;
+      }
+
+      button.secondary:hover:not(:disabled) {
+        border-color: rgba(13, 148, 136, 0.5);
+        color: var(--accent);
+        filter: none;
+      }
+
+      button.danger {
+        border-color: rgba(220, 38, 38, 0.4);
+        background: rgba(220, 38, 38, 0.07);
+        color: #dc2626;
+        box-shadow: none;
+      }
+
+      button.danger:hover:not(:disabled) {
+        background: #dc2626;
+        border-color: #dc2626;
+        color: #ffffff;
+        filter: none;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+        transform: none;
+        filter: none;
+        box-shadow: none;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 14px 0;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border-radius: 999px;
+        border: 1px solid rgba(14, 159, 110, 0.3);
+        background: var(--ok-bg);
+        color: var(--ok);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        transition: color 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+      }
+
+      .pill::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 8px currentColor;
+        flex: none;
+      }
+
+      .pill.warn {
+        border-color: rgba(180, 83, 9, 0.3);
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+
+      .pill.err {
+        border-color: rgba(220, 38, 38, 0.35);
+        background: var(--err-bg);
+        color: var(--err);
+      }
+
+      .notice {
+        display: none;
+        margin: 10px 0;
+        padding: 10px 14px;
+        border-radius: 9px;
+        border-left: 3px solid var(--err);
+        background: var(--err-bg);
+        color: #b91c1c;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .img-tabs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+        gap: 4px;
+        margin: 6px 0 8px;
+        padding: 4px;
+        border: 1px solid var(--border-soft);
+        border-radius: 11px;
+        background: #eef1f6;
+      }
+
+      .img-tab {
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 8px;
+        padding: 7px 8px;
+        box-shadow: none;
+      }
+
+      .img-tab:hover:not(.active):not(:disabled) {
+        color: var(--text);
+        filter: none;
+      }
+
+      .img-tab.active {
+        border-color: rgba(13, 148, 136, 0.35);
+        background: #ffffff;
+        color: var(--accent);
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+      }
+
+      input[type="file"] {
+        cursor: pointer;
+      }
+
+      input[type="file"]::file-selector-button {
+        cursor: pointer;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent);
+        background: rgba(13, 148, 136, 0.09);
+        border: 1px solid rgba(13, 148, 136, 0.35);
+        border-radius: 7px;
+        padding: 6px 12px;
+        margin-right: 10px;
+        transition: background 0.18s ease;
+      }
+
+      input[type="file"]::file-selector-button:hover {
+        background: rgba(13, 148, 136, 0.16);
+      }
+
+      .img-preview {
+        margin-top: 8px;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: contain;
+        border: 1px dashed var(--border);
+        border-radius: 9px;
+        background: #f1f4f9;
+        display: none;
+      }
+
+      .sample-picker {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .sample-character {
+        padding: 5px;
+        border: 1px solid var(--border);
+        background: #ffffff;
+        color: var(--muted);
+        box-shadow: none;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+
+      .sample-character:hover:not(:disabled) {
+        border-color: rgba(13, 148, 136, 0.5);
+        color: var(--accent);
+        filter: none;
+      }
+
+      .sample-character.selected {
+        border-color: var(--accent);
+        color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.14);
+      }
+
+      .sample-character img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1;
+        margin-bottom: 5px;
+        border-radius: 6px;
+        object-fit: cover;
+        background: #eef1f6;
+      }
+
+      .source-pane {
+        margin-top: 8px;
+      }
+
+      .segmentation-controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-soft);
+        border-radius: 9px;
+        background: #f8fafc;
+      }
+
+      .segmentation-controls label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        text-transform: none;
+        letter-spacing: 0;
+        font-family: var(--font-body);
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .segmentation-controls input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        padding: 0;
+        accent-color: var(--accent);
+      }
+
+      .segmentation-controls input[type="color"] {
+        width: 38px;
+        height: 30px;
+        padding: 3px;
+        cursor: pointer;
+      }
+
+      .capture-source {
+        position: fixed !important;
+        inset: auto auto auto -10000px !important;
+        width: 1px !important;
+        height: 1px !important;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .video-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+
+      .video-box {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+      }
+
+      .video-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        background: #f6f8fb;
+        border-bottom: 1px solid var(--border-soft);
+      }
+
+      .video-title::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--err);
+        box-shadow: 0 0 8px rgba(248, 113, 113, 0.9);
+        flex: none;
+        animation: pulse 1.8s ease-in-out infinite;
+      }
+
+      .video-stage {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        background: #0b0f16;
+      }
+
+      .video-stage:empty::before {
+        content: "NO SIGNAL";
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.4em;
+        text-indent: 0.4em;
+        color: #3d4a63;
+        background:
+          repeating-linear-gradient(
+            -55deg,
+            rgba(148, 163, 184, 0.06) 0 2px,
+            transparent 2px 14px
+          );
+      }
+
+      .video-stage video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #000;
+      }
+
+      pre {
+        margin: 8px 0 0;
+        max-height: 320px;
+        overflow: auto;
+        background: #f6f8fb;
+        color: #15664a;
+        border: 1px solid var(--border-soft);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      pre::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      pre::-webkit-scrollbar-thumb {
+        background: #c2cbda;
+        border-radius: 4px;
+      }
+
+      pre::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .field-hint {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 1080px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 900px) {
+        main {
+          padding: 14px 12px 32px;
+        }
+
+        h1 {
+          font-size: 22px;
+        }
+
+        .video-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="toolbar" style="display: flex; justify-content: flex-end">
+        <label for="language" style="margin: 0" data-i18n="language.label">语言</label>
+        <select id="language" aria-label="Language" style="width: auto; margin-left: 8px">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
+      <h1 data-i18n="page.title">实时编辑直播流 Demo</h1>
+      <p class="hint" data-i18n-html="page.hint">
+        Quick Start：<code>python3 quickstart.py --api-key vda_xxx</code><br />
+        页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。点击「创建并连接」后，请允许浏览器使用摄像头和麦克风。<br />
+        内置代理转发 <code>/proxy/{env}/live/...</code>，避免浏览器跨域。
+      </p>
+
+      <div class="layout">
+        <section class="card">
+          <label for="environment" data-i18n="field.environment">环境</label>
+          <select id="environment">
+            <option value="cn" data-i18n="environment.cn">国内</option>
+            <option value="ovs" selected data-i18n="environment.ovs">海外</option>
+          </select>
+          <div class="field-hint" data-i18n-html="field.environmentHint">
+            请求走 <code>/proxy/{env}/live/...</code>。通过 Python quick start 启动时会自动预填。
+          </div>
+
+          <label for="authToken">API Key（vda_...）</label>
+          <input id="authToken" placeholder="vda_..." autocomplete="off" />
+
+          <label data-i18n="field.referenceImage">参考图（编辑用，必填）</label>
+          <div class="img-tabs">
+            <button type="button" class="img-tab active" data-itab="url" data-i18n="tab.imageUrl">图片 URL</button>
+            <button type="button" class="img-tab" data-itab="file" data-i18n="tab.imageFile">本地选图</button>
+            <button type="button" class="img-tab" data-itab="sample" data-i18n="tab.sampleCharacter">示例角色</button>
+          </div>
+          <input id="imageUrl" placeholder="https://example.com/reference.png" spellcheck="false" data-pane="url" />
+          <div data-pane="file" style="display: none">
+            <input id="imageFile" type="file" accept="image/*" />
+          </div>
+          <div data-pane="sample" style="display: none">
+            <div id="samplePicker" class="sample-picker"></div>
+          </div>
+          <img id="imagePreview" class="img-preview" alt="preview" />
+
+          <label for="editingType" data-i18n="field.editingType">编辑场景（editing_type）</label>
+          <select id="editingType">
+            <option value="style_transfer" selected data-i18n="editing.styleTransfer">风格迁移</option>
+            <option value="virtual_tryon" data-i18n="editing.virtualTryon">虚拟试穿</option>
+            <option value="subject_replacement" data-i18n="editing.subjectReplacement">主体替换</option>
+            <option value="background_replacement" data-i18n="editing.backgroundReplacement">背景替换</option>
+          </select>
+
+          <label for="videoSource" data-i18n="field.videoSource">视频输入</label>
+          <select id="videoSource">
+            <option value="camera" selected data-i18n="videoSource.camera">摄像头 + 麦克风</option>
+            <option value="file" data-i18n="videoSource.file">上传的视频</option>
+          </select>
+          <div id="videoFilePane" class="source-pane" style="display: none">
+            <input id="videoFile" type="file" accept="video/*" />
+            <div class="field-hint" data-i18n="field.videoFileHint">连接后视频会自动循环播放并作为编辑输入；不会使用摄像头或麦克风。</div>
+          </div>
+          <div class="segmentation-controls">
+            <label for="enableSegmentation">
+              <input id="enableSegmentation" type="checkbox" />
+              <span data-i18n="field.enableSegmentation">移除背景</span>
+            </label>
+            <label for="segmentationBackgroundColor">
+              <span data-i18n="field.backgroundColor">背景色</span>
+              <input id="segmentationBackgroundColor" type="color" value="#ffffff" disabled />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="joinBtn" data-i18n="button.join">创建并连接</button>
+            <button id="hangupBtn" class="danger" disabled data-i18n="button.hangup">挂断</button>
+          </div>
+          <button id="clearBtn" class="secondary" style="margin-top: 8px" data-i18n="button.clearLog">清空日志</button>
+
+          <div class="status-row">
+            <span id="apiStatus" class="pill warn">API idle</span>
+            <span id="wsStatus" class="pill warn">WS idle</span>
+            <span id="rtcStatus" class="pill warn">RTC idle</span>
+          </div>
+          <div id="mediaNotice" class="notice"></div>
+
+          <h2 style="font-size: 16px" data-i18n="section.switchPrompt">更换参考图</h2>
+          <label data-i18n="field.switchImage">新参考图（可选）</label>
+          <div class="img-tabs">
+            <button type="button" class="img-tab active" data-itab="sw-none" data-i18n="tab.keepImage">不换图</button>
+            <button type="button" class="img-tab" data-itab="sw-url" data-i18n="tab.imageUrl">图片 URL</button>
+            <button type="button" class="img-tab" data-itab="sw-file" data-i18n="tab.imageFile">本地选图</button>
+            <button type="button" class="img-tab" data-itab="sw-sample" data-i18n="tab.sampleCharacter">示例角色</button>
+          </div>
+          <input id="swImageUrl" placeholder="https://example.com/new-reference.png" spellcheck="false" data-pane="sw-url" style="display: none" />
+          <div data-pane="sw-file" style="display: none">
+            <input id="swImageFile" type="file" accept="image/*" />
+          </div>
+          <div data-pane="sw-sample" style="display: none">
+            <div id="swSamplePicker" class="sample-picker"></div>
+          </div>
+          <img id="swImagePreview" class="img-preview" alt="preview" />
+
+          <label for="swEditingType" data-i18n="field.switchEditingType">新编辑场景</label>
+          <select id="swEditingType">
+            <option value="style_transfer" selected data-i18n="editing.styleTransfer">风格迁移</option>
+            <option value="virtual_tryon" data-i18n="editing.virtualTryon">虚拟试穿</option>
+            <option value="subject_replacement" data-i18n="editing.subjectReplacement">主体替换</option>
+            <option value="background_replacement" data-i18n="editing.backgroundReplacement">背景替换</option>
+          </select>
+          <div class="actions" style="grid-template-columns: 1fr">
+            <button id="switchBtn" class="secondary" disabled data-i18n="button.switchPrompt">发送 switch_prompt</button>
+          </div>
+
+          <div style="margin-top: 12px">
+            <strong data-i18n="section.currentSession">当前会话</strong>
+            <pre id="sessionData" data-empty-session="true" data-i18n="session.empty">尚未创建直播流</pre>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="video-grid">
+            <div class="video-box">
+              <div class="video-title" data-i18n="video.localPreview">本地预览（编辑输入）</div>
+              <div class="video-stage">
+                <video id="localPreviewer" muted playsinline autoplay></video>
+                <video id="uploadedVideoSource" class="capture-source" muted playsinline loop preload="auto" aria-hidden="true"></video>
+                <canvas id="uploadedVideoCanvas" class="capture-source" aria-hidden="true"></canvas>
+                <video id="segmentationVideoSource" class="capture-source" muted playsinline autoplay aria-hidden="true"></video>
+                <canvas id="segmentationCanvas" class="capture-source" aria-hidden="true"></canvas>
+                <canvas id="comparisonRecordingCanvas" class="capture-source" aria-hidden="true"></canvas>
+              </div>
+            </div>
+            <div class="video-box">
+              <div class="video-title" data-i18n="video.renderStream">实时编辑合成结果（render_uid）</div>
+              <div id="remoteVideoContainer" class="video-stage"></div>
+            </div>
+          </div>
+
+          <h2 data-i18n="section.eventLog" style="font-size: 16px; margin-top: 16px">事件日志</h2>
+          <pre id="eventLog"></pre>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const $ = (selector) => document.querySelector(selector);
+
+      const joinBtn = $("#joinBtn");
+      const hangupBtn = $("#hangupBtn");
+      const clearBtn = $("#clearBtn");
+      const switchBtn = $("#switchBtn");
+      const eventLog = $("#eventLog");
+      const sessionData = $("#sessionData");
+      const mediaNotice = $("#mediaNotice");
+      const remoteVideoContainer = $("#remoteVideoContainer");
+      const localPreviewer = $("#localPreviewer");
+      const uploadedVideoSource = $("#uploadedVideoSource");
+      const uploadedVideoCanvas = $("#uploadedVideoCanvas");
+      const segmentationVideoSource = $("#segmentationVideoSource");
+      const segmentationCanvas = $("#segmentationCanvas");
+      const comparisonRecordingCanvas = $("#comparisonRecordingCanvas");
+
+      const environments = {
+        cn: { proxyPrefix: "/proxy/cn" },
+        ovs: { proxyPrefix: "/proxy/ovs" },
+      };
+
+      const fallbackLanguage = "zh";
+      const languageStorageKey = "streamQuickStartLanguage";
+      const sampleCharacters = [
+        { label: "Pixar Woman", path: "sample-characters/233708121-a-female-character-in-a-pixar-style-design-is-featured-in-this-full-body-shot-set-against-a-white.jpg" },
+        { label: "Relaxed Woman", path: "sample-characters/animated-woman-character-leaning-against-wall-relaxed-white-backdrop_1260728-14983.avif" },
+        { label: "Black Pixar", path: "sample-characters/black-pixar.png" },
+        { label: "Ghibli", path: "sample-characters/ghibli.webp" },
+        { label: "Cinematic Woman", path: "sample-characters/lucid-origin_high_quality_3D_animated_cinematic_scene_Pixar_DreamWorks_inspired_style_female_-0.jpg" },
+        { label: "Pixar Glasses", path: "sample-characters/pixar-glasses.webp" },
+        { label: "Pixar Woman 2", path: "sample-characters/pixar-style-d-female-character-white-isolated-background-pixar-style-d-female-character-depicted-photo-showcasing-310427940.webp" },
+        { label: "Pixar Man", path: "sample-characters/pixar-style-d-male-character-depicted-photo-showcasing-full-body-view-character-placed-against-white-310480030.webp" },
+        { label: "Pixar Portrait", path: "sample-characters/pixar.jpg" },
+      ];
+      const translations = {
+        zh: {
+          "page.title": "实时编辑直播流 Demo",
+          "page.hint": "Quick Start：<code>python3 quickstart.py --api-key vda_xxx</code><br />页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。视频输入可使用摄像头，也可上传一段循环播放的视频。<br />内置代理转发 <code>/proxy/{env}/live/...</code>，避免浏览器跨域。",
+          "language.label": "语言",
+          "environment.cn": "国内",
+          "environment.ovs": "海外",
+          "field.environment": "环境",
+          "field.environmentHint": "请求走 <code>/proxy/{env}/live/...</code>。通过 Python quick start 启动时会自动预填。",
+          "field.referenceImage": "参考图（编辑用，必填）",
+          "field.editingType": "编辑场景（editing_type）",
+          "field.videoSource": "视频输入",
+          "field.videoFileHint": "连接后视频会自动循环播放并作为编辑输入；不会使用摄像头或麦克风。",
+          "field.enableSegmentation": "移除背景",
+          "field.backgroundColor": "背景色",
+          "videoSource.camera": "摄像头 + 麦克风",
+          "videoSource.file": "上传的视频",
+          "field.switchPrompt": "更换参考图",
+          "field.switchImage": "新参考图（可选）",
+          "field.switchEditingType": "新编辑场景",
+          "editing.styleTransfer": "风格迁移",
+          "editing.virtualTryon": "虚拟试穿",
+          "editing.subjectReplacement": "主体替换",
+          "editing.backgroundReplacement": "背景替换",
+          "tab.imageUrl": "图片 URL",
+          "tab.imageFile": "本地选图",
+          "tab.sampleCharacter": "示例角色",
+          "tab.keepImage": "不换图",
+          "button.join": "创建并连接",
+          "button.hangup": "挂断",
+          "button.clearLog": "清空日志",
+          "button.switchPrompt": "发送 switch_prompt",
+          "section.switchPrompt": "更换参考图",
+          "section.currentSession": "当前会话",
+          "section.eventLog": "事件日志",
+          "video.localPreview": "本地预览（编辑输入）",
+          "video.renderStream": "实时编辑合成结果（render_uid）",
+          "session.empty": "尚未创建直播流",
+          "status.apiIdle": "API idle",
+          "status.apiCreating": "API creating",
+          "status.apiLive": "API live {id}",
+          "status.apiFailed": "API failed",
+          "status.wsIdle": "WS idle",
+          "status.wsConnecting": "WS connecting",
+          "status.wsConnected": "WS connected",
+          "status.wsClosed": "WS closed {code}",
+          "status.wsError": "WS error",
+          "status.wsInitAck": "WS init ack",
+          "status.wsNotReady": "WS NOT_READY",
+          "status.wsInitFailed": "WS init failed",
+          "status.wsForceHangup": "WS force hangup",
+          "status.wsSwitchSent": "WS switch sent",
+          "status.wsSwitchFailed": "WS switch failed {code}",
+          "status.rtcIdle": "RTC idle",
+          "status.rtcJoining": "RTC joining",
+          "status.rtcJoined": "RTC joined",
+          "status.rtcBye": "RTC bye {code}",
+          "status.rtcFailed": "RTC failed",
+          "status.deviceNotReady": "{device}未就绪",
+          "device.camera": "摄像头",
+          "device.microphone": "麦克风",
+          "error.apiKeyRequired": "请先填写 API Key",
+          "error.imageRequired": "请先提供参考图（URL 或本地选图）",
+          "error.imageTooLarge": "本地图片过大（超过 4MB），请换一张或改用图片 URL",
+          "error.sampleImageFailed": "无法加载所选的示例角色图片",
+          "error.actionHttpFailed": "{action} failed: HTTP {status} {text}",
+          "error.actionInvalidJson": "{action} failed: invalid JSON response: {text}",
+          "error.createStreamAction": "Create stream",
+          "error.appWsNotCreated": "App WS 未创建",
+          "error.connInitTimeout": "等待 conn_init_ack 超时",
+          "error.connInitFailed": "conn_init 失败",
+          "error.appWsClosedEarly": "App WS 提前关闭: {code}",
+          "error.liveNotCreated": "尚未创建直播流，请先点击「创建并连接」",
+          "error.appWsNotReady": "App WS 未连接，请等待状态变为 WS init ack",
+          "error.actionFailed": "{action}失败：{reason}",
+          "error.switchImageTooLarge": "本地图片过大（超过 4MB），请换一张或改用图片 URL",
+          "error.sdkNotLoaded": "AliRTC Web SDK 未加载",
+          "error.browserUnsupported": "当前浏览器不支持 AliRTC: {reason}",
+          "error.videoFileRequired": "请先选择要作为输入的视频文件",
+          "error.videoCaptureUnsupported": "当前浏览器不支持从上传的视频采集实时画面。",
+          "error.videoLoadFailed": "无法读取该视频文件；请尝试浏览器支持的 MP4 或 WebM 文件。",
+          "error.videoTrackMissing": "上传的文件没有可用的视频轨道。",
+          "error.segmentationUnavailable": "MediaPipe 分割组件未能加载。",
+          "error.segmentationFailed": "背景分割启动失败",
+          "error.recordingUnsupported": "当前浏览器不支持录制远端视频。",
+          "error.recordingFailed": "远端视频录制失败",
+          "error.comparisonRecordingUnsupported": "当前浏览器不支持录制输入 / 输出对比画面。",
+          "error.mediaPermission": "{device}未授权：请点击浏览器地址栏左侧的权限图标，允许当前页面使用{device}后重试。",
+          "error.mediaNotFound": "未检测到可用{device}：请确认设备已连接，并且系统设置中可以被浏览器访问。",
+          "error.mediaBusy": "{device}无法启动：可能被其他应用占用，请关闭占用{device}的软件后重试。",
+          "error.mediaGeneric": "{device}启动失败：请确认浏览器已允许权限、设备未被占用，然后重试。",
+          "log.streamCreated": "创建直播流成功",
+          "log.connInitRetry": "conn_init 重试（{delayMs}ms 后）",
+          "log.connectAppWs": "连接 App WS",
+          "log.appWsConnected": "App WS 已连接",
+          "log.appWsMessage": "App WS 收到消息",
+          "log.appWsClosed": "App WS 已关闭",
+          "log.appWsError": "App WS 发生错误",
+          "log.switchPromptSent": "switch_prompt 已发送（成功无回执，画面稍后切换）",
+          "log.switchPromptFailed": "switch_prompt 失败回执",
+          "log.sendAppMessage": "App WS 发送消息",
+          "log.rtcJoined": "AliRTC 入会成功",
+          "log.rtcMethod": "AliRTC 调用 {methodName}",
+          "log.remoteUserOnline": "远端用户上线",
+          "log.remoteUserOffline": "远端用户下线",
+          "log.remoteCameraState": "远端摄像头流订阅状态变化",
+          "log.remoteScreenState": "远端屏幕流订阅状态变化",
+          "log.authWillExpire": "AliRTC 鉴权即将过期，请重新创建会话",
+          "log.authExpired": "AliRTC 鉴权已过期，请重新创建会话",
+          "log.remoteAutoplayFailed": "远端 video 自动播放失败，请手动点击播放",
+          "log.hangupSignalFailed": "发送挂断信令失败，继续清理本地状态",
+          "log.rtcCleanupFailed": "AliRTC 清理失败",
+          "log.queryPrefilled": "已从 quick start 参数预填页面",
+          "log.startFailed": "启动失败",
+          "log.hangupFailed": "挂断失败",
+          "log.imageLoaded": "参考图已加载",
+          "log.sampleImageLoaded": "示例角色已选择",
+          "log.videoLoaded": "输入视频已加载",
+          "log.videoInputReady": "已将上传的视频用作 AliRTC 输入",
+          "log.segmentationReady": "MediaPipe 背景分割已启用",
+          "log.segmentationStopped": "MediaPipe 背景分割已停止",
+          "log.recordingStarted": "开始录制输入 / 输出对比画面",
+          "log.recordingStopped": "远端结果录制已停止",
+          "log.recordingSaved": "远端结果录像已保存",
+          "log.recordingEmpty": "远端结果录像没有可保存的数据",
+          "recording.input": "输入",
+          "recording.output": "输出",
+        },
+        en: {
+          "page.title": "Live Editing Stream Demo",
+          "page.hint": "Quick Start: <code>python3 quickstart.py --api-key vda_xxx</code><br />This page creates a live stream, opens the App WebSocket, and joins AliRTC. The video input can be your camera or an uploaded video that loops during the session. You can then switch the reference image or editing scene while live.<br />The built-in proxy forwards <code>/proxy/{env}/live/...</code> requests to avoid browser CORS issues.",
+          "language.label": "Language",
+          "environment.cn": "China",
+          "environment.ovs": "Global",
+          "field.environment": "Environment",
+          "field.environmentHint": "Requests go through <code>/proxy/{env}/live/...</code>. Values are prefilled automatically when launched by Python quick start.",
+          "field.referenceImage": "Reference image (required)",
+          "field.editingType": "Editing scene (editing_type)",
+          "field.videoSource": "Video input",
+          "field.videoFileHint": "The video loops automatically and becomes the editing input after connecting; the camera and microphone are not used.",
+          "field.enableSegmentation": "Remove background",
+          "field.backgroundColor": "Background",
+          "videoSource.camera": "Camera + microphone",
+          "videoSource.file": "Uploaded video",
+          "field.switchPrompt": "Switch reference image",
+          "field.switchImage": "New reference image (optional)",
+          "field.switchEditingType": "New editing scene",
+          "editing.styleTransfer": "Style transfer",
+          "editing.virtualTryon": "Virtual try-on",
+          "editing.subjectReplacement": "Subject replacement",
+          "editing.backgroundReplacement": "Background replacement",
+          "tab.imageUrl": "Image URL",
+          "tab.imageFile": "Local file",
+          "tab.sampleCharacter": "Sample character",
+          "tab.keepImage": "Keep image",
+          "button.join": "Create and Connect",
+          "button.hangup": "Hang Up",
+          "button.clearLog": "Clear Log",
+          "button.switchPrompt": "Send switch_prompt",
+          "section.switchPrompt": "Switch reference image",
+          "section.currentSession": "Current Session",
+          "section.eventLog": "Event Log",
+          "video.localPreview": "Local Preview (editing input)",
+          "video.renderStream": "Live editing result (render_uid)",
+          "session.empty": "No live stream created yet",
+          "status.apiIdle": "API idle",
+          "status.apiCreating": "API creating",
+          "status.apiLive": "API live {id}",
+          "status.apiFailed": "API failed",
+          "status.wsIdle": "WS idle",
+          "status.wsConnecting": "WS connecting",
+          "status.wsConnected": "WS connected",
+          "status.wsClosed": "WS closed {code}",
+          "status.wsError": "WS error",
+          "status.wsInitAck": "WS init ack",
+          "status.wsNotReady": "WS NOT_READY",
+          "status.wsInitFailed": "WS init failed",
+          "status.wsForceHangup": "WS force hangup",
+          "status.wsSwitchSent": "WS switch sent",
+          "status.wsSwitchFailed": "WS switch failed {code}",
+          "status.rtcIdle": "RTC idle",
+          "status.rtcJoining": "RTC joining",
+          "status.rtcJoined": "RTC joined",
+          "status.rtcBye": "RTC bye {code}",
+          "status.rtcFailed": "RTC failed",
+          "status.deviceNotReady": "{device} not ready",
+          "device.camera": "Camera",
+          "device.microphone": "Microphone",
+          "error.apiKeyRequired": "Please enter the API Key first",
+          "error.imageRequired": "Please provide a reference image (URL or local file)",
+          "error.imageTooLarge": "Local image is too large (over 4MB); use a smaller one or an image URL",
+          "error.sampleImageFailed": "The selected sample character image could not be loaded",
+          "error.actionHttpFailed": "{action} failed: HTTP {status} {text}",
+          "error.actionInvalidJson": "{action} failed: invalid JSON response: {text}",
+          "error.createStreamAction": "Create stream",
+          "error.appWsNotCreated": "App WS not created",
+          "error.connInitTimeout": "Timed out waiting for conn_init_ack",
+          "error.connInitFailed": "conn_init failed",
+          "error.appWsClosedEarly": "App WS closed early: {code}",
+          "error.liveNotCreated": "No live stream created yet; click \"Create and Connect\" first",
+          "error.appWsNotReady": "App WS is not connected; wait for the WS init ack state",
+          "error.actionFailed": "{action} failed: {reason}",
+          "error.switchImageTooLarge": "Local image is too large (over 4MB); use a smaller one or an image URL",
+          "error.sdkNotLoaded": "AliRTC Web SDK not loaded",
+          "error.browserUnsupported": "This browser does not support AliRTC: {reason}",
+          "error.videoFileRequired": "Choose a video file to use as the input first",
+          "error.videoCaptureUnsupported": "This browser cannot capture a live stream from an uploaded video.",
+          "error.videoLoadFailed": "The video could not be loaded; try a browser-compatible MP4 or WebM file.",
+          "error.videoTrackMissing": "The uploaded file does not contain a usable video track.",
+          "error.segmentationUnavailable": "The MediaPipe segmentation component could not be loaded.",
+          "error.segmentationFailed": "Background segmentation failed to start",
+          "error.recordingUnsupported": "This browser does not support recording the remote video.",
+          "error.recordingFailed": "Remote video recording failed",
+          "error.comparisonRecordingUnsupported": "This browser cannot record the input/output comparison canvas.",
+          "error.mediaPermission": "{device} permission denied: click the permission icon on the left of the address bar, allow this page to use the {device}, then retry.",
+          "error.mediaNotFound": "No usable {device} detected: make sure it is connected and accessible to the browser in system settings.",
+          "error.mediaBusy": "{device} cannot start: it may be occupied by another app; close that app and retry.",
+          "error.mediaGeneric": "{device} failed to start: make sure the browser permission is granted and the device is not occupied, then retry.",
+          "log.streamCreated": "Live stream created",
+          "log.connInitRetry": "Retry conn_init after {delayMs}ms",
+          "log.connectAppWs": "Connecting App WS",
+          "log.appWsConnected": "App WS connected",
+          "log.appWsMessage": "App WS message received",
+          "log.appWsClosed": "App WS closed",
+          "log.appWsError": "App WS error",
+          "log.switchPromptSent": "switch_prompt sent (no ack on success; the video switches shortly)",
+          "log.switchPromptFailed": "switch_prompt failure ack",
+          "log.sendAppMessage": "App WS message sent",
+          "log.rtcJoined": "AliRTC joined",
+          "log.rtcMethod": "AliRTC call {methodName}",
+          "log.remoteUserOnline": "Remote user online",
+          "log.remoteUserOffline": "Remote user offline",
+          "log.remoteCameraState": "Remote camera stream subscribe state changed",
+          "log.remoteScreenState": "Remote screen stream subscribe state changed",
+          "log.authWillExpire": "AliRTC auth is about to expire; create a new session",
+          "log.authExpired": "AliRTC auth expired; create a new session",
+          "log.remoteAutoplayFailed": "Remote video autoplay failed; click the video to play manually",
+          "log.hangupSignalFailed": "Failed to send hangup signal; continue local cleanup",
+          "log.rtcCleanupFailed": "AliRTC cleanup failed",
+          "log.queryPrefilled": "Page prefilled from quick start parameters",
+          "log.startFailed": "Start failed",
+          "log.hangupFailed": "Hangup failed",
+          "log.imageLoaded": "Reference image loaded",
+          "log.sampleImageLoaded": "Sample character selected",
+          "log.videoLoaded": "Input video loaded",
+          "log.videoInputReady": "Uploaded video is ready as the AliRTC input",
+          "log.segmentationReady": "MediaPipe background segmentation enabled",
+          "log.segmentationStopped": "MediaPipe background segmentation stopped",
+          "log.recordingStarted": "Started recording the input/output comparison",
+          "log.recordingStopped": "Remote result recording stopped",
+          "log.recordingSaved": "Remote result recording saved",
+          "log.recordingEmpty": "The remote result recording contained no data to save",
+          "recording.input": "INPUT",
+          "recording.output": "OUTPUT",
+        },
+      };
+
+      function t(key, params = {}) {
+        const lang = translations[state.language] ? state.language : fallbackLanguage;
+        let text = translations[lang][key] ?? translations[fallbackLanguage][key] ?? key;
+        for (const [name, value] of Object.entries(params)) {
+          text = text.split(`{${name}}`).join(String(value));
+        }
+        return text;
+      }
+
+      function applyLanguage(language, { persist = false } = {}) {
+        state.language = translations[language] ? language : fallbackLanguage;
+        document.documentElement.lang = state.language === "zh" ? "zh-CN" : "en";
+        for (const el of document.querySelectorAll("[data-i18n]")) {
+          el.textContent = t(el.dataset.i18n);
+        }
+        for (const el of document.querySelectorAll("[data-i18n-html]")) {
+          el.innerHTML = t(el.dataset.i18nHtml);
+        }
+        for (const el of document.querySelectorAll("[data-i18n-placeholder]")) {
+          el.placeholder = t(el.dataset.i18nPlaceholder);
+        }
+        if (sessionData.dataset.emptySession === "true") {
+          sessionData.textContent = t("session.empty");
+        }
+        $("#language").value = state.language;
+        if (persist) {
+          window.localStorage.setItem(languageStorageKey, state.language);
+        }
+      }
+
+      function detectInitialLanguage() {
+        const stored = window.localStorage.getItem(languageStorageKey);
+        if (stored && translations[stored]) {
+          return stored;
+        }
+        return navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+      }
+
+      const state = {
+        language: "zh",
+        live: null,
+        rtc: null,
+        clientSecret: "",
+        renderUid: "",
+        connId: "",
+        seqId: 1,
+        appSocket: undefined,
+        aliRtcEngine: undefined,
+        remoteVideoElMap: new Map(),
+        connInitRetryTimer: undefined,
+        videoObjectUrl: "",
+        uploadedCaptureStream: undefined,
+        uploadedVideoDrawFrame: undefined,
+        remoteRecording: undefined,
+        mediaBunnyModulePromise: undefined,
+        createSamplePath: "",
+        createSampleDataURI: "",
+        createSamplePromise: undefined,
+        switchSamplePath: "",
+        switchSampleDataURI: "",
+        switchSamplePromise: undefined,
+        segmentationProcessor: undefined,
+        segmentationRawStream: undefined,
+        segmentedCaptureStream: undefined,
+        segmentationFrameRequest: undefined,
+        segmentationRunning: false,
+        localPreviewRefreshPromise: Promise.resolve(),
+      };
+
+      function newConnectionId() {
+        if (window.crypto?.randomUUID) {
+          return window.crypto.randomUUID();
+        }
+        return `conn-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+      }
+
+      function log(message, payload) {
+        const time = new Date().toLocaleTimeString();
+        const line = payload === undefined ? `[${time}] ${message}` : `[${time}] ${message} ${JSON.stringify(payload, null, 2)}`;
+        eventLog.textContent += `${line}\n`;
+        eventLog.scrollTop = eventLog.scrollHeight;
+      }
+
+      function setStatus(selector, key, tone = "warn", params = {}) {
+        const el = $(selector);
+        el.textContent = t(key, params);
+        el.className = `pill ${tone}`;
+      }
+
+      function showNotice(message) {
+        mediaNotice.style.display = "block";
+        mediaNotice.textContent = message;
+      }
+
+      function showMediaNotice(device, error) {
+        const name = error?.name || "";
+        let key = "error.mediaGeneric";
+        if (name === "NotAllowedError") {
+          key = "error.mediaPermission";
+        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+          key = "error.mediaNotFound";
+        } else if (name === "NotReadableError" || name === "TrackStartError") {
+          key = "error.mediaBusy";
+        }
+        showNotice(t(key, { device: t(`device.${device}`) }));
+      }
+
+      function clearMediaNotice() {
+        mediaNotice.style.display = "none";
+        mediaNotice.textContent = "";
+      }
+
+      function stripAuthPrefix(value) {
+        return (value || "").replace(/^(Token|Bearer)\s+/i, "").trim();
+      }
+
+      function httpAuthHeader(value) {
+        const token = stripAuthPrefix(value);
+        if (!token) {
+          return "";
+        }
+        return token.startsWith("vda_") ? `Token ${token}` : `Token ${token}`;
+      }
+
+      function wsAuthQuery(value) {
+        return stripAuthPrefix(value);
+      }
+
+      function apiUrl(path) {
+        const env = environments[$("#environment").value] ?? environments.ovs;
+        return `${env.proxyPrefix}${path}`;
+      }
+
+      function wsUrl(path, query) {
+        const env = environments[$("#environment").value] ?? environments.ovs;
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${protocol}//${window.location.host}${env.proxyPrefix}${path}?${query}`;
+      }
+
+      function maskKey(value) {
+        const token = stripAuthPrefix(value);
+        if (!token) {
+          return "";
+        }
+        return `${token.slice(0, 8)}...`;
+      }
+
+      async function parseJsonResponse(response, action) {
+        const text = await response.text();
+        if (!response.ok) {
+          throw new Error(t("error.actionHttpFailed", { action, status: response.status, text: text.slice(0, 300) }));
+        }
+        try {
+          return text ? JSON.parse(text) : {};
+        } catch (_error) {
+          throw new Error(t("error.actionInvalidJson", { action, text: text.slice(0, 200) }));
+        }
+      }
+
+      /* ---------- 参考图双输入（创建 + 换图共用） ---------- */
+      // 注：空前缀时 [data-itab^=""] 按 CSS 规范不匹配任何元素，需显式区分两组。
+      function groupTabSelector(groupPrefix) {
+        return groupPrefix === "sw" ? ".img-tab[data-itab^='sw-']" : ".img-tab:not([data-itab^='sw-'])";
+      }
+
+      function groupPaneSelector(groupPrefix) {
+        return groupPrefix === "sw" ? "[data-pane^='sw-']" : "[data-pane]:not([data-pane^='sw-'])";
+      }
+
+      function bindImageTabs(groupPrefix) {
+        document.querySelectorAll(groupTabSelector(groupPrefix)).forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document.querySelectorAll(groupTabSelector(groupPrefix)).forEach((b) => {
+              b.classList.remove("active");
+            });
+            btn.classList.add("active");
+            const pane = btn.dataset.itab;
+            document.querySelectorAll(groupPaneSelector(groupPrefix)).forEach((el) => {
+              el.style.display = el.dataset.pane === pane ? "" : "none";
+            });
+            const preview = $(`#${groupPrefix === "sw" ? "swImagePreview" : "imagePreview"}`);
+            const isSamplePane = pane === "sample" || pane === "sw-sample";
+            const samplePath = groupPrefix === "sw" ? state.switchSamplePath : state.createSamplePath;
+            if (isSamplePane && samplePath) {
+              preview.src = samplePath;
+              preview.style.display = "block";
+            } else if (pane !== "url" && pane !== "sw-file" && pane !== "sw-url") {
+              preview.style.display = "none";
+            }
+          });
+        });
+      }
+
+      function activeImageValue(groupPrefix) {
+        const active = document.querySelector(`${groupTabSelector(groupPrefix)}.active`);
+        if (!active) {
+          return "";
+        }
+        const pane = active.dataset.itab;
+        if (groupPrefix === "" ) {
+          if (pane === "url") {
+            return $("#imageUrl").value.trim();
+          }
+          if (pane === "sample") {
+            return state.createSampleDataURI;
+          }
+          return state.createImageDataURI;
+        }
+        if (pane === "sw-url") {
+          return $("#swImageUrl").value.trim();
+        }
+        if (pane === "sw-file") {
+          return state.switchImageDataURI;
+        }
+        if (pane === "sw-sample") {
+          return state.switchSampleDataURI;
+        }
+        return "";
+      }
+
+      function readFileAsDataURL(file, sizeLimitBytes) {
+        return new Promise((resolve, reject) => {
+          if (file.size > sizeLimitBytes) {
+            reject(new Error("too large"));
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(reader.error || new Error("read failed"));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const IMAGE_SIZE_LIMIT = 4 * 1024 * 1024;
+
+      async function loadSampleImage(path) {
+        const response = await fetch(path);
+        if (!response.ok) {
+          throw new Error(t("error.sampleImageFailed"));
+        }
+        return readFileAsDataURL(await response.blob(), IMAGE_SIZE_LIMIT);
+      }
+
+      function bindSamplePicker(groupPrefix) {
+        const isSwitch = groupPrefix === "sw";
+        const picker = $(`#${isSwitch ? "swSamplePicker" : "samplePicker"}`);
+        const pathKey = isSwitch ? "switchSamplePath" : "createSamplePath";
+        const dataKey = isSwitch ? "switchSampleDataURI" : "createSampleDataURI";
+        const promiseKey = isSwitch ? "switchSamplePromise" : "createSamplePromise";
+        const preview = $(`#${isSwitch ? "swImagePreview" : "imagePreview"}`);
+
+        for (const sample of sampleCharacters) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "sample-character";
+          button.dataset.samplePath = sample.path;
+          button.setAttribute("aria-label", sample.label);
+          button.setAttribute("aria-pressed", "false");
+          const image = document.createElement("img");
+          image.src = sample.path;
+          image.alt = "";
+          image.loading = "lazy";
+          const name = document.createElement("span");
+          name.textContent = sample.label;
+          button.append(image, name);
+          button.addEventListener("click", () => {
+            picker.querySelectorAll(".sample-character").forEach((item) => {
+              const selected = item === button;
+              item.classList.toggle("selected", selected);
+              item.setAttribute("aria-pressed", String(selected));
+            });
+            state[pathKey] = sample.path;
+            state[dataKey] = "";
+            preview.src = sample.path;
+            preview.style.display = "block";
+            const promise = loadSampleImage(sample.path).then((dataURI) => {
+              if (state[pathKey] === sample.path) {
+                state[dataKey] = dataURI;
+                log(t("log.sampleImageLoaded"), { name: sample.label, path: sample.path });
+              }
+              return dataURI;
+            });
+            state[promiseKey] = promise;
+            promise.catch((error) => showNotice(error.message || t("error.sampleImageFailed")));
+          });
+          picker.appendChild(button);
+        }
+      }
+
+      async function waitForActiveSample(groupPrefix) {
+        const active = document.querySelector(`${groupTabSelector(groupPrefix)}.active`);
+        const isSwitch = groupPrefix === "sw";
+        const samplePane = isSwitch ? "sw-sample" : "sample";
+        if (active?.dataset.itab !== samplePane) {
+          return;
+        }
+        const promise = state[isSwitch ? "switchSamplePromise" : "createSamplePromise"];
+        if (!promise) {
+          throw new Error(t("error.imageRequired"));
+        }
+        try {
+          await promise;
+        } catch (_error) {
+          throw new Error(t("error.sampleImageFailed"));
+        }
+      }
+
+      function isUploadedVideoSelected() {
+        return $("#videoSource").value === "file";
+      }
+
+      function isSegmentationEnabled() {
+        return $("#enableSegmentation").checked;
+      }
+
+      function validateVideoInput() {
+        if (isSegmentationEnabled()) {
+          if (!navigator.gpu || !window.tf || !window.bodySegmentation) {
+            throw new Error(t("error.segmentationUnavailable"));
+          }
+          if (typeof segmentationCanvas.captureStream !== "function") {
+            throw new Error(t("error.videoCaptureUnsupported"));
+          }
+        }
+        if (!isUploadedVideoSelected()) {
+          return;
+        }
+        if (!$("#videoFile").files?.[0]) {
+          throw new Error(t("error.videoFileRequired"));
+        }
+        const canCaptureVideo = typeof uploadedVideoSource.captureStream === "function" || typeof uploadedVideoSource.mozCaptureStream === "function";
+        if (!canCaptureVideo && typeof uploadedVideoCanvas.captureStream !== "function") {
+          throw new Error(t("error.videoCaptureUnsupported"));
+        }
+      }
+
+      function stopUploadedVideoCapture() {
+        if (state.uploadedVideoDrawFrame) {
+          window.cancelAnimationFrame(state.uploadedVideoDrawFrame);
+          state.uploadedVideoDrawFrame = undefined;
+        }
+        state.uploadedCaptureStream?.getTracks().forEach((track) => track.stop());
+        state.uploadedCaptureStream = undefined;
+        uploadedVideoSource.pause();
+        uploadedVideoSource.removeAttribute("src");
+        uploadedVideoSource.load();
+      }
+
+      function clearVideoObjectUrl() {
+        if (state.videoObjectUrl) {
+          URL.revokeObjectURL(state.videoObjectUrl);
+          state.videoObjectUrl = "";
+        }
+      }
+
+      function waitForVideoReady(video) {
+        if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          return Promise.resolve();
+        }
+        return new Promise((resolve, reject) => {
+          const cleanup = () => {
+            video.removeEventListener("loadeddata", onReady);
+            video.removeEventListener("error", onError);
+          };
+          const onReady = () => {
+            cleanup();
+            resolve();
+          };
+          const onError = () => {
+            cleanup();
+            reject(new Error(t("error.videoLoadFailed")));
+          };
+          video.addEventListener("loadeddata", onReady, { once: true });
+          video.addEventListener("error", onError, { once: true });
+        });
+      }
+
+      async function previewUploadedVideo(file) {
+        stopUploadedVideoCapture();
+        clearVideoObjectUrl();
+        state.videoObjectUrl = URL.createObjectURL(file);
+        localPreviewer.srcObject = null;
+        localPreviewer.src = state.videoObjectUrl;
+        localPreviewer.loop = true;
+        localPreviewer.muted = true;
+        await waitForVideoReady(localPreviewer);
+        await localPreviewer.play();
+      }
+
+      async function prepareUploadedVideoCapture() {
+        const file = await prepareUploadedVideoElement();
+        const captureStream = uploadedVideoSource.captureStream || uploadedVideoSource.mozCaptureStream;
+        if (typeof captureStream === "function") {
+          state.uploadedCaptureStream = captureStream.call(uploadedVideoSource);
+        } else if (typeof uploadedVideoCanvas.captureStream === "function") {
+          uploadedVideoCanvas.width = uploadedVideoSource.videoWidth;
+          uploadedVideoCanvas.height = uploadedVideoSource.videoHeight;
+          const context = uploadedVideoCanvas.getContext("2d", { alpha: false });
+          const drawFrame = () => {
+            context.drawImage(uploadedVideoSource, 0, 0, uploadedVideoCanvas.width, uploadedVideoCanvas.height);
+            state.uploadedVideoDrawFrame = window.requestAnimationFrame(drawFrame);
+          };
+          drawFrame();
+          state.uploadedCaptureStream = uploadedVideoCanvas.captureStream(30);
+        } else {
+          throw new Error(t("error.videoCaptureUnsupported"));
+        }
+        if (!state.uploadedCaptureStream.getVideoTracks().length) {
+          stopUploadedVideoCapture();
+          throw new Error(t("error.videoTrackMissing"));
+        }
+        log(t("log.videoInputReady"), { name: file.name, type: file.type, size: file.size });
+      }
+
+      async function prepareUploadedVideoElement() {
+        const file = $("#videoFile").files?.[0];
+        if (!file) {
+          throw new Error(t("error.videoFileRequired"));
+        }
+        stopUploadedVideoCapture();
+        if (!state.videoObjectUrl) {
+          state.videoObjectUrl = URL.createObjectURL(file);
+        }
+        uploadedVideoSource.src = state.videoObjectUrl;
+        uploadedVideoSource.currentTime = 0;
+        await waitForVideoReady(uploadedVideoSource);
+        await uploadedVideoSource.play();
+        return file;
+      }
+
+      async function withUploadedVideoAsCamera(callback) {
+        await prepareUploadedVideoCapture();
+        const mediaDevices = navigator.mediaDevices;
+        const originalGetUserMedia = mediaDevices?.getUserMedia;
+        if (!originalGetUserMedia) {
+          throw new Error(t("error.videoCaptureUnsupported"));
+        }
+        mediaDevices.getUserMedia = async function (constraints) {
+          if (!constraints?.video) {
+            return originalGetUserMedia.call(mediaDevices, constraints);
+          }
+          const videoTrack = state.uploadedCaptureStream?.getVideoTracks()[0];
+          if (!videoTrack || videoTrack.readyState === "ended") {
+            throw new Error(t("error.videoTrackMissing"));
+          }
+          return new MediaStream([videoTrack.clone()]);
+        };
+        try {
+          return await callback();
+        } finally {
+          mediaDevices.getUserMedia = originalGetUserMedia;
+        }
+      }
+
+      async function stopSegmentationProcessing() {
+        state.segmentationRunning = false;
+        if (state.segmentationFrameRequest) {
+          window.cancelAnimationFrame(state.segmentationFrameRequest);
+          state.segmentationFrameRequest = undefined;
+        }
+        state.segmentedCaptureStream?.getTracks().forEach((track) => track.stop());
+        state.segmentedCaptureStream = undefined;
+        state.segmentationRawStream?.getTracks().forEach((track) => track.stop());
+        state.segmentationRawStream = undefined;
+        segmentationVideoSource.pause();
+        segmentationVideoSource.srcObject = null;
+        if (state.segmentationProcessor) {
+          try {
+            await state.segmentationProcessor.dispose();
+          } catch (_error) {
+            // The model may already be disposed after its source track ends.
+          }
+          state.segmentationProcessor = undefined;
+          log(t("log.segmentationStopped"));
+        }
+      }
+
+      async function startSegmentationProcessing(sourceVideo) {
+        if (!navigator.gpu || !window.tf || !window.bodySegmentation) {
+          throw new Error(t("error.segmentationUnavailable"));
+        }
+        if (typeof segmentationCanvas.captureStream !== "function") {
+          throw new Error(t("error.videoCaptureUnsupported"));
+        }
+
+        const width = sourceVideo.videoWidth || 1280;
+        const height = sourceVideo.videoHeight || 720;
+        // The TFJS mask wrapper uses the element's declared dimensions when it
+        // constructs its output, not only videoWidth/videoHeight.
+        if (sourceVideo instanceof HTMLVideoElement) {
+          sourceVideo.width = width;
+          sourceVideo.height = height;
+        }
+        segmentationCanvas.width = width;
+        segmentationCanvas.height = height;
+        // Compositing requires a transparent intermediate foreground. An opaque
+        // backing store makes source-in retain the entire original image.
+        const context = segmentationCanvas.getContext("2d", { alpha: true });
+        const maskCanvas = document.createElement("canvas");
+        maskCanvas.width = width;
+        maskCanvas.height = height;
+        const maskContext = maskCanvas.getContext("2d");
+        context.fillStyle = $("#segmentationBackgroundColor").value;
+        context.fillRect(0, 0, width, height);
+
+        await window.tf.setBackend("webgpu");
+        await window.tf.ready();
+        if (window.tf.getBackend() !== "webgpu") {
+          throw new Error("WebGPU initialization failed; segmentation requires the WebGPU backend.");
+        }
+        const processor = await window.bodySegmentation.createSegmenter(
+          window.bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation,
+          {
+            runtime: "tfjs",
+            modelType: "landscape",
+          },
+        );
+        state.segmentationProcessor = processor;
+        state.segmentedCaptureStream = segmentationCanvas.captureStream(30);
+        state.segmentationRunning = true;
+
+        const renderSegmentation = async () => {
+          const people = await processor.segmentPeople(sourceVideo, { flipHorizontal: false });
+          const personMask = people[0]?.mask;
+          if (!personMask) throw new Error("The WebGPU segmenter returned no person mask.");
+          const maskTensor = await personMask.toTensor();
+          const dimensions = maskTensor.shape;
+          const maskHeight = dimensions[0];
+          const maskWidth = dimensions[1];
+          const maskChannels = dimensions[2] || 1;
+          if (!maskWidth || !maskHeight) {
+            maskTensor.dispose();
+            throw new Error(`The WebGPU segmenter returned an invalid mask size: ${JSON.stringify(dimensions)}.`);
+          }
+          const confidenceValues = await maskTensor.data();
+          maskTensor.dispose();
+          if (maskCanvas.width !== maskWidth || maskCanvas.height !== maskHeight) {
+            maskCanvas.width = maskWidth;
+            maskCanvas.height = maskHeight;
+          }
+          const maskImage = maskContext.createImageData(maskWidth, maskHeight);
+          for (let pixel = 0; pixel < maskWidth * maskHeight; pixel += 1) {
+            const offset = pixel * 4;
+            const rawConfidence = maskChannels >= 4
+              ? confidenceValues[pixel * maskChannels + 3]
+              : confidenceValues[pixel * maskChannels];
+            const confidence = rawConfidence > 1 ? rawConfidence / 255 : rawConfidence;
+            maskImage.data[offset] = 255;
+            maskImage.data[offset + 1] = 255;
+            maskImage.data[offset + 2] = 255;
+            maskImage.data[offset + 3] = confidence <= 0.1
+              ? 0
+              : Math.min(255, Math.round((confidence - 0.1) * 255 / 0.9));
+          }
+          maskContext.putImageData(maskImage, 0, 0);
+
+          context.save();
+          context.clearRect(0, 0, width, height);
+          context.drawImage(maskCanvas, 0, 0, width, height);
+          context.globalCompositeOperation = "source-in";
+          context.drawImage(sourceVideo, 0, 0, width, height);
+          context.globalCompositeOperation = "destination-over";
+          context.fillStyle = $("#segmentationBackgroundColor").value;
+          context.fillRect(0, 0, width, height);
+          context.restore();
+        };
+
+        let processingFrame = false;
+        const processFrame = async () => {
+          if (!state.segmentationRunning) {
+            return;
+          }
+          if (!processingFrame && sourceVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            processingFrame = true;
+            try {
+              await renderSegmentation();
+            } catch (error) {
+              state.segmentationRunning = false;
+              showNotice(`${t("error.segmentationFailed")}: ${error.message || String(error)}`);
+              log(t("error.segmentationFailed"), errorToJson(error));
+              return;
+            } finally {
+              processingFrame = false;
+            }
+          }
+          state.segmentationFrameRequest = window.requestAnimationFrame(processFrame);
+        };
+        processFrame();
+        log(t("log.segmentationReady"), {
+          width,
+          height,
+          background: $("#segmentationBackgroundColor").value,
+          backend: window.tf.getBackend(),
+        });
+      }
+
+      async function withSegmentedVideoAsCamera(callback) {
+        await stopSegmentationProcessing();
+        const mediaDevices = navigator.mediaDevices;
+        const originalGetUserMedia = mediaDevices?.getUserMedia;
+        if (!originalGetUserMedia) {
+          throw new Error(t("error.videoCaptureUnsupported"));
+        }
+        const useUploadedVideo = isUploadedVideoSelected();
+        let initialized = false;
+        mediaDevices.getUserMedia = async function (constraints) {
+          if (!constraints?.video) {
+            return originalGetUserMedia.call(mediaDevices, constraints);
+          }
+          if (!initialized) {
+            let sourceVideo;
+            if (useUploadedVideo) {
+              await prepareUploadedVideoElement();
+              sourceVideo = uploadedVideoSource;
+            } else {
+              state.segmentationRawStream = await originalGetUserMedia.call(mediaDevices, constraints);
+              segmentationVideoSource.srcObject = state.segmentationRawStream;
+              await segmentationVideoSource.play();
+              await waitForVideoReady(segmentationVideoSource);
+              sourceVideo = segmentationVideoSource;
+            }
+            await startSegmentationProcessing(sourceVideo);
+            initialized = true;
+          }
+          const videoTrack = state.segmentedCaptureStream?.getVideoTracks()[0];
+          if (!videoTrack || videoTrack.readyState === "ended") {
+            throw new Error(t("error.videoTrackMissing"));
+          }
+          const tracks = [videoTrack.clone()];
+          if (!useUploadedVideo && constraints.audio) {
+            state.segmentationRawStream?.getAudioTracks().forEach((track) => tracks.push(track.clone()));
+          }
+          return new MediaStream(tracks);
+        };
+        try {
+          return await callback();
+        } finally {
+          mediaDevices.getUserMedia = originalGetUserMedia;
+        }
+      }
+
+      async function refreshLocalInputPreview() {
+        await stopSegmentationProcessing();
+        localPreviewer.pause();
+        localPreviewer.srcObject = null;
+
+        if (!isSegmentationEnabled()) {
+          if (isUploadedVideoSelected()) {
+            const file = $("#videoFile").files?.[0];
+            if (file) await previewUploadedVideo(file);
+          } else {
+            localPreviewer.removeAttribute("src");
+            localPreviewer.load();
+          }
+          return;
+        }
+
+        let sourceVideo;
+        if (isUploadedVideoSelected()) {
+          if (!$("#videoFile").files?.[0]) return;
+          await prepareUploadedVideoElement();
+          sourceVideo = uploadedVideoSource;
+        } else {
+          if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error(t("error.videoCaptureUnsupported"));
+          }
+          state.segmentationRawStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false,
+          });
+          segmentationVideoSource.srcObject = state.segmentationRawStream;
+          await segmentationVideoSource.play();
+          await waitForVideoReady(segmentationVideoSource);
+          sourceVideo = segmentationVideoSource;
+        }
+
+        await startSegmentationProcessing(sourceVideo);
+        localPreviewer.removeAttribute("src");
+        localPreviewer.srcObject = state.segmentedCaptureStream;
+        await localPreviewer.play();
+      }
+
+      function queueLocalInputPreviewRefresh() {
+        state.localPreviewRefreshPromise = state.localPreviewRefreshPromise
+          .catch(() => {})
+          .then(() => refreshLocalInputPreview())
+          .catch((error) => {
+            if (!isUploadedVideoSelected()) showMediaNotice("camera", error);
+            else showNotice(error.message || String(error));
+            log(t("error.segmentationFailed"), errorToJson(error));
+          });
+        return state.localPreviewRefreshPromise;
+      }
+
+      $("#videoSource").addEventListener("change", () => {
+        const useFile = isUploadedVideoSelected();
+        clearMediaNotice();
+        $("#videoFilePane").style.display = useFile ? "" : "none";
+        queueLocalInputPreviewRefresh();
+      });
+
+      $("#enableSegmentation").addEventListener("change", (event) => {
+        $("#segmentationBackgroundColor").disabled = !event.target.checked;
+        clearMediaNotice();
+        queueLocalInputPreviewRefresh();
+      });
+
+      $("#videoFile").addEventListener("change", async () => {
+        const file = $("#videoFile").files?.[0];
+        if (!file) {
+          return;
+        }
+        clearMediaNotice();
+        try {
+          await queueLocalInputPreviewRefresh();
+          log(t("log.videoLoaded"), { name: file.name, size: file.size, type: file.type });
+        } catch (error) {
+          showNotice(error.message || t("error.videoLoadFailed"));
+        }
+      });
+
+      $("#imageFile").addEventListener("change", async () => {
+        const file = $("#imageFile").files?.[0];
+        if (!file) {
+          return;
+        }
+        try {
+          const dataURI = await readFileAsDataURL(file, IMAGE_SIZE_LIMIT);
+          state.createImageDataURI = dataURI;
+          const preview = $("#imagePreview");
+          preview.src = dataURI;
+          preview.style.display = "block";
+          log(t("log.imageLoaded"), { name: file.name, size: file.size, type: file.type });
+        } catch (_error) {
+          state.createImageDataURI = "";
+          showNotice(t("error.imageTooLarge"));
+        }
+      });
+
+      $("#swImageFile").addEventListener("change", async () => {
+        const file = $("#swImageFile").files?.[0];
+        if (!file) {
+          return;
+        }
+        try {
+          const dataURI = await readFileAsDataURL(file, IMAGE_SIZE_LIMIT);
+          state.switchImageDataURI = dataURI;
+          const preview = $("#swImagePreview");
+          preview.src = dataURI;
+          preview.style.display = "block";
+          log(t("log.imageLoaded"), { name: file.name, size: file.size, type: file.type });
+        } catch (_error) {
+          state.switchImageDataURI = "";
+          showNotice(t("error.switchImageTooLarge"));
+        }
+      });
+
+      /* ---------- 创建直播流 ---------- */
+      async function createStream() {
+        const auth = httpAuthHeader($("#authToken").value);
+        if (!auth) {
+          throw new Error(t("error.apiKeyRequired"));
+        }
+        await waitForActiveSample("");
+        const image = activeImageValue("");
+        if (!image) {
+          throw new Error(t("error.imageRequired"));
+        }
+        const body = {
+          image_url: image,
+          editing_type: $("#editingType").value,
+        };
+
+        setStatus("#apiStatus", "status.apiCreating", "warn");
+        log("POST /live/s_editing/realtime", {
+          image_url: image.startsWith("data:") ? `data:...(base64 ${Math.round(image.length / 1024)}KB)` : image,
+          editing_type: body.editing_type,
+        });
+        const response = await fetch(apiUrl("/live/s_editing/realtime"), {
+          method: "POST",
+          headers: {
+            Authorization: auth,
+            "Content-Type": "application/json",
+            Accept: "*/*",
+          },
+          body: JSON.stringify(body),
+        });
+        const payload = await parseJsonResponse(response, t("error.createStreamAction"));
+        state.live = payload.live;
+        state.rtc = payload.rtc;
+        state.clientSecret = payload.client_secret || "";
+        state.renderUid = payload.render_uid || "";
+        sessionData.textContent = JSON.stringify(payload, null, 2);
+        sessionData.dataset.emptySession = "false";
+        setStatus("#apiStatus", "status.apiLive", "ok", { id: state.live.id });
+        log(t("log.streamCreated"), { live_id: state.live.id, render_uid: state.renderUid });
+      }
+
+      function buildConnInitSignal() {
+        return {
+          type: 1,
+          live_id: String(state.live.id),
+          conn_id: state.connId,
+          seq_id: state.seqId++,
+          payload: {
+            conn_init: {
+              version: 1,
+            },
+          },
+        };
+      }
+
+      function scheduleConnInitRetry(delayMs = 2000) {
+        clearConnInitRetry();
+        state.connInitRetryTimer = window.setTimeout(() => {
+          log(t("log.connInitRetry", { delayMs }));
+          sendConnInit();
+        }, delayMs);
+      }
+
+      function clearConnInitRetry() {
+        if (state.connInitRetryTimer) {
+          window.clearTimeout(state.connInitRetryTimer);
+          state.connInitRetryTimer = undefined;
+        }
+      }
+
+      function sendConnInit() {
+        sendAppSignal(buildConnInitSignal());
+      }
+
+      function connectAppWebSocket() {
+        const wsToken = wsAuthQuery($("#authToken").value);
+        if (!wsToken) {
+          throw new Error(t("error.apiKeyRequired"));
+        }
+        const query = new URLSearchParams({
+          live_id: String(state.live.id),
+          conn_id: state.connId,
+          authorization: wsToken,
+        });
+        if (state.clientSecret) {
+          query.set("client_secret", state.clientSecret);
+        }
+        const url = wsUrl("/live/ws/live/connect", query);
+        log(t("log.connectAppWs"), { url: url.replace(wsToken, `${wsToken.slice(0, 8)}...`) });
+        state.appSocket = new WebSocket(url);
+        setStatus("#wsStatus", "status.wsConnecting", "warn");
+
+        state.appSocket.addEventListener("open", () => {
+          setStatus("#wsStatus", "status.wsConnected", "ok");
+          log(t("log.appWsConnected"));
+          sendConnInit();
+        });
+        state.appSocket.addEventListener("message", (event) => {
+          const payload = safeJson(event.data);
+          log(t("log.appWsMessage"), payload ?? event.data);
+          handleAppMessage(payload);
+        });
+        state.appSocket.addEventListener("close", (event) => {
+          clearConnInitRetry();
+          setStatus("#wsStatus", "status.wsClosed", "warn", { code: event.code });
+          setInteractiveEnabled(false);
+          log(t("log.appWsClosed"), { code: event.code, reason: event.reason });
+        });
+        state.appSocket.addEventListener("error", () => {
+          setStatus("#wsStatus", "status.wsError", "warn");
+          log(t("log.appWsError"));
+        });
+      }
+
+      function waitForConnInitAck(timeoutMs = 120000) {
+        return new Promise((resolve, reject) => {
+          const socket = state.appSocket;
+          if (!socket) {
+            reject(new Error(t("error.appWsNotCreated")));
+            return;
+          }
+          const timer = window.setTimeout(() => {
+            cleanup();
+            reject(new Error(t("error.connInitTimeout")));
+          }, timeoutMs);
+          const onMessage = (event) => {
+            const payload = safeJson(event.data);
+            const ack = payload?.payload?.conn_init_ack;
+            if (payload?.type === 2 && ack) {
+              if (ack.success) {
+                cleanup();
+                resolve(ack);
+              } else if (ack.error_code !== "NOT_READY") {
+                cleanup();
+                reject(new Error(t("error.connInitFailed")));
+              }
+            }
+          };
+          const onClose = (event) => {
+            cleanup();
+            reject(new Error(t("error.appWsClosedEarly", { code: event.code })));
+          };
+          function cleanup() {
+            window.clearTimeout(timer);
+            socket.removeEventListener("message", onMessage);
+            socket.removeEventListener("close", onClose);
+          }
+          socket.addEventListener("message", onMessage);
+          socket.addEventListener("close", onClose);
+        });
+      }
+
+      function handleAppMessage(payload) {
+        if (!payload) {
+          return;
+        }
+        const ack = payload.payload?.conn_init_ack;
+        if (payload.type === 2 && ack) {
+          if (ack.success) {
+            clearConnInitRetry();
+            setStatus("#wsStatus", "status.wsInitAck", "ok");
+            setInteractiveEnabled(true);
+          } else if (ack.error_code === "NOT_READY") {
+            setStatus("#wsStatus", "status.wsNotReady", "warn");
+            scheduleConnInitRetry(2000);
+          } else {
+            setStatus("#wsStatus", "status.wsInitFailed", "warn");
+          }
+        }
+        const switchAck = payload.payload?.switch_prompt_ack;
+        if (payload.type === 14 && switchAck && !switchAck.success) {
+          setStatus("#wsStatus", "status.wsSwitchFailed", "err", { code: switchAck.error_code || "" });
+          log(t("log.switchPromptFailed"), { error_code: switchAck.error_code, error_msg: switchAck.error_msg });
+        }
+        if (payload.type === 6) {
+          setStatus("#wsStatus", "status.wsForceHangup", "warn");
+          setInteractiveEnabled(false);
+        }
+      }
+
+      function wsReadyError() {
+        if (!state.live?.id) {
+          return t("error.liveNotCreated");
+        }
+        if (!state.appSocket || state.appSocket.readyState !== WebSocket.OPEN) {
+          return t("error.appWsNotReady");
+        }
+        return "";
+      }
+
+      function ensureWsReady(action) {
+        const reason = wsReadyError();
+        if (reason) {
+          throw new Error(t("error.actionFailed", { action, reason }));
+        }
+      }
+
+      function sendAppSignal(payload, label = t("log.sendAppMessage")) {
+        ensureWsReady(label);
+        state.appSocket.send(JSON.stringify(payload));
+        log(label, payload);
+      }
+
+      /* ---------- 运行中换图 / 换场景 ---------- */
+      async function sendSwitchPrompt() {
+        if (!state.live) {
+          showNotice(t("error.liveNotCreated"));
+          return;
+        }
+        const reason = wsReadyError();
+        if (reason) {
+          showNotice(t("error.actionFailed", { action: "switch_prompt", reason }));
+          return;
+        }
+        try {
+          await waitForActiveSample("sw");
+          const image = activeImageValue("sw");
+          const editingType = $("#swEditingType").value;
+          clearMediaNotice();
+          const sp = {
+            editing_type: editingType,
+          };
+          if (image) {
+            sp.prompts = [{ type: "image", content: image }];
+          }
+          sendAppSignal(
+            {
+              type: 13,
+              live_id: String(state.live.id),
+              conn_id: state.connId,
+              seq_id: state.seqId++,
+              payload: { switch_prompt: sp },
+            },
+            t("log.switchPromptSent"),
+          );
+          setStatus("#wsStatus", "status.wsSwitchSent", "ok");
+        } catch (error) {
+          showNotice(error.message || String(error));
+        }
+      }
+
+      /* ---------- AliRTC ---------- */
+      async function joinAliRtc() {
+        if (!window.AliRtcEngine) {
+          throw new Error(t("error.sdkNotLoaded"));
+        }
+        const checkResult = await window.AliRtcEngine.isSupported();
+        if (!checkResult.support) {
+          throw new Error(t("error.browserUnsupported", { reason: checkResult.reason || "unknown" }));
+        }
+
+        window.AliRtcEngine.setLogLevel(0);
+        state.aliRtcEngine = window.AliRtcEngine.getInstance();
+        listenAliRtcEvents(state.aliRtcEngine);
+        const useUploadedVideo = isUploadedVideoSelected();
+        const useSegmentation = isSegmentationEnabled();
+        await callOptionalEngineMethod(state.aliRtcEngine, "setChannelProfile", "communication");
+        // AliRTC auto-captures before join when publishing is enabled. Disable that
+        // path for custom sources so the SDK cannot replace our processed canvas
+        // track with the raw camera track.
+        await callOptionalEngineMethod(state.aliRtcEngine, "publishLocalAudioStream", !useUploadedVideo);
+        await callOptionalEngineMethod(state.aliRtcEngine, "publishLocalVideoStream", !useUploadedVideo && !useSegmentation);
+        await callOptionalEngineMethod(state.aliRtcEngine, "setDefaultSubscribeAllRemoteAudioStreams", true);
+        await callOptionalEngineMethod(state.aliRtcEngine, "setDefaultSubscribeAllRemoteVideoStreams", true);
+
+        const joinAndPublish = async () => {
+          // Web SDK 使用创建返回的 base64 authInfo 字符串入会（与 alirtc/index.html 一致）。
+          const displayName = state.rtc.user_id;
+          setStatus("#rtcStatus", "status.rtcJoining", "warn");
+          log("AliRTC joinChannel", {
+            appId: state.rtc.app_id,
+            channelId: state.rtc.channel_id,
+            userId: state.rtc.user_id,
+            tokenType: "base64",
+            videoSource: useUploadedVideo ? "file" : "camera",
+            segmentation: useSegmentation,
+            timestamp: Number(state.rtc.token_expire_at),
+          });
+          await state.aliRtcEngine.joinChannel(state.rtc.token, displayName);
+
+          try {
+            if (useUploadedVideo || useSegmentation) {
+              // Enabling publishing here makes AliRTC request its camera track
+              // while getUserMedia is intercepted by the wrappers below.
+              await callOptionalEngineMethod(state.aliRtcEngine, "publishLocalVideoStream", true);
+              const previewStream = useSegmentation ? state.segmentedCaptureStream : state.uploadedCaptureStream;
+              if (!previewStream?.getVideoTracks().length) {
+                throw new Error(t("error.videoTrackMissing"));
+              }
+              localPreviewer.pause();
+              localPreviewer.removeAttribute("src");
+              localPreviewer.srcObject = previewStream;
+              await localPreviewer.play();
+            } else {
+              await callOptionalEngineMethod(state.aliRtcEngine, "setLocalViewConfig", "localPreviewer", 1);
+              await callOptionalEngineMethod(state.aliRtcEngine, "startPreview", 1);
+              await callOptionalEngineMethod(state.aliRtcEngine, "publishLocalVideoStream", true);
+            }
+          } catch (error) {
+            if (useUploadedVideo || useSegmentation) {
+              showNotice(error.message || String(error));
+            } else {
+              showMediaNotice("camera", error);
+            }
+            throw error;
+          }
+          if (!useUploadedVideo) {
+            try {
+              await callOptionalEngineMethod(state.aliRtcEngine, "publishLocalAudioStream", true);
+            } catch (error) {
+              showMediaNotice("microphone", error);
+              throw error;
+            }
+          }
+        };
+
+        if (useSegmentation) {
+          await withSegmentedVideoAsCamera(joinAndPublish);
+        } else if (useUploadedVideo) {
+          await withUploadedVideoAsCamera(joinAndPublish);
+        } else {
+          await joinAndPublish();
+        }
+
+        setStatus("#rtcStatus", "status.rtcJoined", "ok");
+        log(t("log.rtcJoined"));
+      }
+
+      async function callOptionalEngineMethod(engine, methodName, ...args) {
+        if (typeof engine[methodName] !== "function") {
+          return;
+        }
+        await engine[methodName](...args);
+        log(t("log.rtcMethod", { methodName }), { args });
+      }
+
+      function listenAliRtcEvents(engine) {
+        engine.on("bye", (code) => {
+          setStatus("#rtcStatus", "status.rtcBye", "warn", { code });
+          log("AliRTC bye", { code });
+        });
+        engine.on("remoteUserOnLineNotify", (userId, elapsed) => {
+          log(t("log.remoteUserOnline"), { userId, elapsed });
+        });
+        engine.on("remoteUserOffLineNotify", (userId, reason) => {
+          log(t("log.remoteUserOffline"), { userId, reason });
+          removeRemoteVideo(userId, "camera");
+          removeRemoteVideo(userId, "screen");
+        });
+        engine.on("videoSubscribeStateChanged", (userId, oldState, newState, interval, channelId) => {
+          log(t("log.remoteCameraState"), { userId, oldState, newState, interval, channelId });
+          handleRemoteVideo(userId, "camera", newState, 1);
+        });
+        engine.on("screenShareSubscribeStateChanged", (userId, oldState, newState, interval, channelId) => {
+          log(t("log.remoteScreenState"), { userId, oldState, newState, interval, channelId });
+          handleRemoteVideo(userId, "screen", newState, 2);
+        });
+        engine.on("authInfoWillExpire", () => log(t("log.authWillExpire")));
+        engine.on("authInfoExpired", () => {
+          setStatus("#rtcStatus", "status.rtcFailed", "err");
+          log(t("log.authExpired"));
+        });
+      }
+
+      function preferredRecordingMimeType() {
+        if (typeof MediaRecorder.isTypeSupported !== "function") {
+          return "";
+        }
+        const candidates = [
+          "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+          "video/mp4",
+        ];
+        return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      }
+
+      function drawVideoContained(context, video, x, y, width, height) {
+        if (!video.videoWidth || !video.videoHeight || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          return;
+        }
+        const scale = Math.min(width / video.videoWidth, height / video.videoHeight);
+        const drawWidth = video.videoWidth * scale;
+        const drawHeight = video.videoHeight * scale;
+        context.drawImage(
+          video,
+          x + (width - drawWidth) / 2,
+          y + (height - drawHeight) / 2,
+          drawWidth,
+          drawHeight,
+        );
+      }
+
+      function drawComparisonFrame(context, remoteVideo) {
+        const width = comparisonRecordingCanvas.width;
+        const height = comparisonRecordingCanvas.height;
+        const panelWidth = width / 2;
+        context.fillStyle = "#0b0f16";
+        context.fillRect(0, 0, width, height);
+        drawVideoContained(context, localPreviewer, 0, 0, panelWidth, height);
+        drawVideoContained(context, remoteVideo, panelWidth, 0, panelWidth, height);
+        context.fillStyle = "rgba(11, 15, 22, 0.72)";
+        context.fillRect(0, 0, panelWidth, 34);
+        context.fillRect(panelWidth, 0, panelWidth, 34);
+        context.fillStyle = "#ffffff";
+        context.font = "600 16px IBM Plex Mono, monospace";
+        context.textBaseline = "middle";
+        context.fillText(t("recording.input"), 14, 17);
+        context.fillText(t("recording.output"), panelWidth + 14, 17);
+        context.fillStyle = "rgba(255, 255, 255, 0.35)";
+        context.fillRect(panelWidth - 1, 0, 2, height);
+      }
+
+      const mediaBunnyCdnUrl = "https://cdn.jsdelivr.net/npm/mediabunny@1.55.4/+esm";
+
+      function loadMediaBunny() {
+        if (!state.mediaBunnyModulePromise) {
+          state.mediaBunnyModulePromise = import(mediaBunnyCdnUrl).catch((error) => {
+            state.mediaBunnyModulePromise = undefined;
+            throw error;
+          });
+        }
+        return state.mediaBunnyModulePromise;
+      }
+
+      function cleanupComparisonRecording(session) {
+        if (session.frameRequest) {
+          window.cancelAnimationFrame(session.frameRequest);
+          session.frameRequest = undefined;
+        }
+        if (session.frameTimer) {
+          window.clearTimeout(session.frameTimer);
+          session.frameTimer = undefined;
+        }
+        session.stream?.getTracks().forEach((track) => track.stop());
+        session.audioTrack?.stop();
+      }
+
+      async function startMediaBunnyRecording(session, video) {
+        const {
+          BufferTarget,
+          CanvasSource,
+          MediaStreamAudioTrackSource,
+          Mp4OutputFormat,
+          Output,
+          Quality,
+        } = await loadMediaBunny();
+        if (session.stopRequested) return;
+
+        comparisonRecordingCanvas.width = 1280;
+        comparisonRecordingCanvas.height = 360;
+        session.context = comparisonRecordingCanvas.getContext("2d", { alpha: false });
+        drawComparisonFrame(session.context, video);
+
+        session.target = new BufferTarget();
+        session.output = new Output({
+          format: new Mp4OutputFormat(),
+          target: session.target,
+        });
+        session.videoSource = new CanvasSource(comparisonRecordingCanvas, {
+          codec: "avc",
+          quality: new Quality("high"),
+        });
+        session.output.addVideoTrack(session.videoSource, { frameRate: session.frameRate });
+
+        const remoteAudioTrack = video.srcObject.getAudioTracks()[0];
+        if (remoteAudioTrack) {
+          session.audioTrack = remoteAudioTrack.clone();
+          session.audioSource = new MediaStreamAudioTrackSource(session.audioTrack, {
+            codec: "aac",
+            quality: new Quality({ bitrate: 128e3 }),
+          });
+          session.output.addAudioTrack(session.audioSource);
+        }
+
+        await session.output.start();
+        session.kind = "mediabunny";
+        session.mimeType = "video/mp4";
+        session.active = true;
+        session.audioSource?.errorPromise.catch((error) => {
+          log(t("error.recordingFailed"), errorToJson(error));
+        });
+
+        const encodeFrame = async () => {
+          if (!session.active) return;
+          const startedAt = performance.now();
+          drawComparisonFrame(session.context, video);
+          const timestamp = session.frameIndex / session.frameRate;
+          session.frameEncodingPromise = session.videoSource.add(timestamp, 1 / session.frameRate);
+          await session.frameEncodingPromise;
+          session.frameEncodingPromise = undefined;
+          session.frameIndex += 1;
+          if (session.active) {
+            const delay = Math.max(0, (1000 / session.frameRate) - (performance.now() - startedAt));
+            session.frameTimer = window.setTimeout(encodeFrame, delay);
+          }
+        };
+        session.frameTimer = window.setTimeout(encodeFrame, 0);
+        log(t("log.recordingStarted"), { encoder: "MediaBunny", mimeType: session.mimeType });
+      }
+
+      function startMediaRecorderFallback(session, video) {
+        if (typeof window.MediaRecorder !== "function" || typeof comparisonRecordingCanvas.captureStream !== "function") {
+          throw new Error(t("error.comparisonRecordingUnsupported"));
+        }
+        comparisonRecordingCanvas.width = 1280;
+        comparisonRecordingCanvas.height = 360;
+        const context = comparisonRecordingCanvas.getContext("2d", { alpha: false });
+        drawComparisonFrame(context, video);
+        session.stream = comparisonRecordingCanvas.captureStream(session.frameRate);
+        video.srcObject.getAudioTracks().forEach((track) => session.stream.addTrack(track.clone()));
+        const mimeType = preferredRecordingMimeType();
+        if (!mimeType) {
+          throw new Error("This browser cannot encode MP4 with MediaRecorder.");
+        }
+        session.recorder = new MediaRecorder(session.stream, mimeType ? { mimeType } : undefined);
+        session.kind = "mediarecorder";
+        session.chunks = [];
+        session.mimeType = session.recorder.mimeType || mimeType;
+        const drawFrame = () => {
+          drawComparisonFrame(context, video);
+          session.frameRequest = window.requestAnimationFrame(drawFrame);
+        };
+        drawFrame();
+        session.stopPromise = new Promise((resolve) => {
+          session.recorder.addEventListener("stop", () => {
+            session.blob = new Blob(session.chunks, { type: session.mimeType });
+            cleanupComparisonRecording(session);
+            resolve(session.blob);
+          }, { once: true });
+        });
+        session.recorder.addEventListener("dataavailable", (event) => {
+          if (event.data?.size) session.chunks.push(event.data);
+        });
+        session.recorder.addEventListener("error", (event) => {
+          log(t("error.recordingFailed"), errorToJson(event.error || event));
+        });
+        session.recorder.start(1000);
+        log(t("log.recordingStarted"), { encoder: "MediaRecorder fallback", mimeType: session.mimeType });
+      }
+
+      async function initializeRemoteRecording(session, video) {
+        try {
+          await startMediaBunnyRecording(session, video);
+        } catch (mediaBunnyError) {
+          log("MediaBunny unavailable; using MediaRecorder fallback", errorToJson(mediaBunnyError));
+          cleanupComparisonRecording(session);
+          session.videoSource?.close();
+          session.audioSource?.close();
+          try {
+            await session.output?.cancel?.();
+          } catch (_) {
+            // The MediaRecorder fallback can still start after partial encoder setup fails.
+          }
+          if (!session.stopRequested) startMediaRecorderFallback(session, video);
+        }
+      }
+
+      function tryStartRemoteRecording(video) {
+        if (state.remoteRecording || !(video.srcObject instanceof MediaStream)) return;
+        const session = {
+          kind: "starting",
+          frameRate: 30,
+          frameIndex: 0,
+          frameTimer: undefined,
+          frameEncodingPromise: undefined,
+          stopRequested: false,
+          active: false,
+        };
+        state.remoteRecording = session;
+        session.readyPromise = initializeRemoteRecording(session, video).catch((error) => {
+          if (state.remoteRecording === session) state.remoteRecording = undefined;
+          showNotice(`${t("error.recordingFailed")}: ${error.message || String(error)}`);
+          log(t("error.recordingFailed"), errorToJson(error));
+        });
+      }
+
+      function recordingFilename(mimeType) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const liveId = String(state.live?.id || "session").replace(/[^a-zA-Z0-9_-]/g, "-");
+        const extension = mimeType.includes("mp4") ? "mp4" : "webm";
+        return `vidu-input-output-${liveId}-${timestamp}.${extension}`;
+      }
+
+      function downloadRecording(blob, mimeType) {
+        const filename = recordingFilename(mimeType);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        log(t("log.recordingSaved"), { filename, bytes: blob.size, mimeType });
+      }
+
+      async function stopRemoteRecording({ download = false } = {}) {
+        const session = state.remoteRecording;
+        if (!session) {
+          return;
+        }
+        session.stopRequested = true;
+        await session.readyPromise;
+        let blob;
+        try {
+          if (session.kind === "mediabunny") {
+            session.active = false;
+            cleanupComparisonRecording(session);
+            await session.frameEncodingPromise;
+            session.videoSource.close();
+            session.audioSource?.close();
+            await session.output.finalize();
+            blob = new Blob([session.target.buffer], { type: session.mimeType });
+          } else if (session.kind === "mediarecorder") {
+            if (session.recorder.state !== "inactive") session.recorder.stop();
+            const stopTimeout = new Promise((resolve) => {
+              window.setTimeout(() => resolve(new Blob(session.chunks, { type: session.mimeType })), 2000);
+            });
+            blob = session.blob || await Promise.race([session.stopPromise, stopTimeout]);
+            cleanupComparisonRecording(session);
+          }
+          if (blob) {
+            log(t("log.recordingStopped"), { bytes: blob.size, mimeType: session.mimeType, encoder: session.kind });
+            if (download && blob.size) downloadRecording(blob, session.mimeType);
+            else if (download) log(t("log.recordingEmpty"));
+          }
+        } catch (error) {
+          showNotice(`${t("error.recordingFailed")}: ${error.message || String(error)}`);
+          log(t("error.recordingFailed"), errorToJson(error));
+        } finally {
+          cleanupComparisonRecording(session);
+          if (state.remoteRecording === session) state.remoteRecording = undefined;
+        }
+      }
+
+      function handleRemoteVideo(userId, kind, newState, streamType) {
+        if (newState !== 3) {
+          return;
+        }
+        // 只渲染 render_uid 的摄像头流：即实时编辑合成结果。
+        if (userId !== state.renderUid || kind !== "camera") {
+          log(t("log.remoteCameraState"), { userId, kind, skipped: true });
+          return;
+        }
+        const key = `${kind}_${userId}`;
+        if (state.remoteVideoElMap.has(key)) {
+          return;
+        }
+        const video = document.createElement("video");
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+        video.dataset.uid = userId;
+        remoteVideoContainer.textContent = "";
+        remoteVideoContainer.appendChild(video);
+        state.remoteVideoElMap.set(key, video);
+        const startRecording = () => tryStartRemoteRecording(video);
+        video.addEventListener("loadedmetadata", startRecording, { once: true });
+        video.addEventListener("playing", startRecording, { once: true });
+        callOptionalEngineMethod(state.aliRtcEngine, "setRemoteViewConfig", video, userId, streamType)
+          .then(startRecording)
+          .catch((error) => log(t("error.recordingFailed"), errorToJson(error)));
+        video.play().catch(() => log(t("log.remoteAutoplayFailed")));
+      }
+
+      function removeRemoteVideo(userId, kind) {
+        const key = `${kind}_${userId}`;
+        const video = state.remoteVideoElMap.get(key);
+        if (!video) {
+          return;
+        }
+        video.remove();
+        state.remoteVideoElMap.delete(key);
+      }
+
+      /* ---------- 会话生命周期 ---------- */
+      function setInteractiveEnabled(enabled) {
+        switchBtn.disabled = !enabled;
+      }
+
+      function setSourceControlsDisabled(disabled) {
+        $("#videoSource").disabled = disabled;
+        $("#videoFile").disabled = disabled;
+        $("#enableSegmentation").disabled = disabled;
+        $("#segmentationBackgroundColor").disabled = !isSegmentationEnabled();
+      }
+
+      async function resetSessionState() {
+        clearConnInitRetry();
+        closeAppSocket();
+        await stopRemoteRecording();
+        await cleanupRtc();
+        state.live = null;
+        state.rtc = null;
+        state.clientSecret = "";
+        state.renderUid = "";
+        sessionData.dataset.emptySession = "true";
+        sessionData.textContent = t("session.empty");
+        clearMediaNotice();
+        setInteractiveEnabled(false);
+        setStatus("#apiStatus", "status.apiIdle", "warn");
+        setStatus("#wsStatus", "status.wsIdle", "warn");
+      }
+
+      function closeAppSocket() {
+        if (!state.appSocket) {
+          return;
+        }
+        if (state.appSocket.readyState === WebSocket.OPEN || state.appSocket.readyState === WebSocket.CONNECTING) {
+          state.appSocket.close();
+        }
+        state.appSocket = undefined;
+      }
+
+      async function cleanupRtc() {
+        for (const key of [...state.remoteVideoElMap.keys()]) {
+          const [type, userId] = key.split("_");
+          removeRemoteVideo(userId, type);
+        }
+        if (!state.aliRtcEngine) {
+          await stopSegmentationProcessing();
+          stopUploadedVideoCapture();
+          return;
+        }
+        try {
+          await callOptionalEngineMethod(state.aliRtcEngine, "stopPreview");
+          await callOptionalEngineMethod(state.aliRtcEngine, "leaveChannel");
+        } catch (error) {
+          log(t("log.rtcCleanupFailed"), errorToJson(error));
+        } finally {
+          state.aliRtcEngine.destroy();
+          state.aliRtcEngine = undefined;
+          await stopSegmentationProcessing();
+          stopUploadedVideoCapture();
+          setStatus("#rtcStatus", "status.rtcIdle", "warn");
+        }
+      }
+
+      async function hangup() {
+        hangupBtn.disabled = true;
+        try {
+          await stopRemoteRecording({ download: true });
+        } catch (error) {
+          log(t("error.recordingFailed"), errorToJson(error));
+        }
+        try {
+          sendAppSignal(
+            {
+              type: 5,
+              live_id: String(state.live.id),
+              conn_id: state.connId,
+              seq_id: state.seqId++,
+              payload: { hangup: { hangup_reason: "user_hangup" } },
+            },
+            "App WS call_hangup",
+          );
+        } catch (error) {
+          log(t("log.hangupSignalFailed"), errorToJson(error));
+        }
+        await resetSessionState();
+        hangupBtn.disabled = true;
+        joinBtn.disabled = false;
+        setSourceControlsDisabled(false);
+        queueLocalInputPreviewRefresh();
+      }
+
+      function safeJson(value) {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return undefined;
+        }
+      }
+
+      function errorToJson(error) {
+        return {
+          name: error?.name,
+          message: error?.message || String(error),
+          stack: error?.stack,
+        };
+      }
+
+      function applyQueryDefaults() {
+        const params = new URLSearchParams(window.location.search);
+        const fieldMap = {
+          env: "environment",
+          api_key: "authToken",
+          authorization: "authToken",
+        };
+        for (const [paramName, elementId] of Object.entries(fieldMap)) {
+          if (!params.has(paramName)) {
+            continue;
+          }
+          const el = $(`#${elementId}`);
+          if (!el) {
+            continue;
+          }
+          el.value = params.get(paramName);
+        }
+        if (params.size > 0) {
+          log(t("log.queryPrefilled"), {
+            env: $("#environment").value,
+            api_key: $("#authToken").value ? maskKey($("#authToken").value) : "",
+          });
+        }
+      }
+
+      /* ---------- 启动 ---------- */
+      bindImageTabs("");
+      bindImageTabs("sw");
+      bindSamplePicker("");
+      bindSamplePicker("sw");
+      applyLanguage(detectInitialLanguage());
+      applyQueryDefaults();
+      state.connId = newConnectionId();
+
+      $("#language").addEventListener("change", (event) => {
+        applyLanguage(event.target.value, { persist: true });
+      });
+
+      joinBtn.addEventListener("click", async () => {
+        try {
+          validateVideoInput();
+        } catch (error) {
+          showNotice(error.message || String(error));
+          return;
+        }
+        joinBtn.disabled = true;
+        hangupBtn.disabled = false;
+        setSourceControlsDisabled(true);
+        try {
+          await state.localPreviewRefreshPromise.catch(() => {});
+          await resetSessionState();
+          await createStream();
+          connectAppWebSocket();
+          log("waiting conn_init_ack (NOT_READY auto-retries)");
+          await waitForConnInitAck();
+          await joinAliRtc();
+        } catch (error) {
+          log(t("log.startFailed"), errorToJson(error));
+          setStatus("#apiStatus", "status.apiFailed", "warn");
+          setStatus("#rtcStatus", "status.rtcFailed", "warn");
+          hangupBtn.disabled = true;
+          joinBtn.disabled = false;
+          setSourceControlsDisabled(false);
+          await cleanupRtc();
+          closeAppSocket();
+          queueLocalInputPreviewRefresh();
+        }
+      });
+
+      hangupBtn.addEventListener("click", () => {
+        hangup().catch((error) => log(t("log.hangupFailed"), errorToJson(error)));
+      });
+
+      clearBtn.addEventListener("click", () => {
+        eventLog.textContent = "";
+      });
+
+      switchBtn.addEventListener("click", sendSwitchPrompt);
+    </script>
+  </body>
+</html>
