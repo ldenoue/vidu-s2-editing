@@ -1,11 +1,16 @@
 # Local secrets
 .env
 .env.*
-!.env.example
+.dev.vars
+.dev.vars.*
 
 # Python-generated files
 __pycache__/
 *.py[cod]
+
+# Node and Cloudflare-generated files
+node_modules/
+.wrangler/
 
 # OS and editor files
 .DS_Store

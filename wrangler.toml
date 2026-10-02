@@ -1,0 +1,10 @@
+name = "vidu-s2-editing"
+main = "worker/index.js"
+compatibility_date = "2026-10-02"
+account_id = "c2d9f1b0a8a4331e65b0e12d7c2482c0"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true

@@ -680,9 +680,8 @@
 
       <h1 data-i18n="page.title">实时编辑直播流 Demo</h1>
       <p class="hint" data-i18n-html="page.hint">
-        Quick Start：<code>python3 quickstart.py --api-key vda_xxx</code><br />
         页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。点击「创建并连接」后，请允许浏览器使用摄像头和麦克风。<br />
-        浏览器会使用你填写的 API Key 直接连接 Vidu；密钥不会经过本项目的服务器。
+        Cloudflare Worker 会使用你填写的 API Key 创建 Vidu 会话；之后浏览器会使用短期凭证直接连接 Vidu。
       </p>
 
       <div class="layout">
@@ -693,7 +692,7 @@
             <option value="ovs" selected data-i18n="environment.ovs">海外</option>
           </select>
           <div class="field-hint" data-i18n-html="field.environmentHint">
-            请求会直接发送到所选区域的 Vidu API。通过 Python quick start 启动时会自动预填。
+            会话创建请求会通过同源 Cloudflare Worker 转发到所选区域的 Vidu API。
           </div>
 
           <label for="authToken">API Key（vda_...）</label>
@@ -833,8 +832,8 @@
       const comparisonRecordingCanvas = $("#comparisonRecordingCanvas");
 
       const environments = {
-        cn: { apiBase: "https://api.vidu.cn", wsBase: "wss://api.vidu.cn" },
-        ovs: { apiBase: "https://api.vidu.com", wsBase: "wss://api.vidu.com" },
+        cn: { apiEnv: "cn", wsBase: "wss://api.vidu.cn" },
+        ovs: { apiEnv: "ovs", wsBase: "wss://api.vidu.com" },
       };
 
       const fallbackLanguage = "zh";
@@ -853,12 +852,12 @@
       const translations = {
         zh: {
           "page.title": "实时编辑直播流 Demo",
-          "page.hint": "Quick Start：<code>python3 quickstart.py --api-key vda_xxx</code><br />页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。视频输入可使用摄像头，也可上传一段循环播放的视频。<br />浏览器会使用你填写的 API Key 直接连接 Vidu；密钥不会经过本项目的服务器。",
+          "page.hint": "页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。视频输入可使用摄像头，也可上传一段循环播放的视频。<br />Cloudflare Worker 会使用你填写的 API Key 创建 Vidu 会话；之后浏览器会使用短期凭证直接连接 Vidu。",
           "language.label": "语言",
           "environment.cn": "国内",
           "environment.ovs": "海外",
           "field.environment": "环境",
-          "field.environmentHint": "请求会直接发送到所选区域的 Vidu API。通过 Python quick start 启动时会自动预填。",
+          "field.environmentHint": "会话创建请求会通过同源 Cloudflare Worker 转发到所选区域的 Vidu API。",
           "field.referenceImage": "参考图（编辑用，必填）",
           "field.editingType": "编辑场景（editing_type）",
           "field.videoSource": "视频输入",
@@ -980,12 +979,12 @@
         },
         en: {
           "page.title": "Live Editing Stream Demo",
-          "page.hint": "Quick Start: <code>python3 quickstart.py --api-key vda_xxx</code><br />This page creates a live stream, opens the App WebSocket, and joins AliRTC. The video input can be your camera or an uploaded video that loops during the session. You can then switch the reference image or editing scene while live.<br />Your browser connects directly to Vidu using the API key you provide; the key does not pass through this project's server.",
+          "page.hint": "This page creates a live stream, opens the App WebSocket, and joins AliRTC. The video input can be your camera or an uploaded video that loops during the session. You can then switch the reference image or editing scene while live.<br />The Cloudflare Worker uses the API key you provide to create the Vidu session; your browser then connects directly to Vidu with the short-lived credential.",
           "language.label": "Language",
           "environment.cn": "China",
           "environment.ovs": "Global",
           "field.environment": "Environment",
-          "field.environmentHint": "Requests are sent directly to the Vidu API for the selected region. Values are prefilled automatically when launched by Python quick start.",
+          "field.environmentHint": "The session-creation request is forwarded to the selected Vidu region by the same-origin Cloudflare Worker.",
           "field.referenceImage": "Reference image (required)",
           "field.editingType": "Editing scene (editing_type)",
           "field.videoSource": "Video input",
@@ -1228,9 +1227,9 @@
         return token;
       }
 
-      function apiUrl(path) {
+      function sessionUrl() {
         const env = environments[$("#environment").value] ?? environments.ovs;
-        return `${env.apiBase}${path}`;
+        return `/api/session?env=${encodeURIComponent(env.apiEnv)}`;
       }
 
       function wsUrl(path, query) {
@@ -1877,7 +1876,7 @@
           image_url: image.startsWith("data:") ? `data:...(base64 ${Math.round(image.length / 1024)}KB)` : image,
           editing_type: body.editing_type,
         });
-        const response = await fetch(apiUrl("/live/s_editing/realtime"), {
+        const response = await fetch(sessionUrl(), {
           method: "POST",
           headers: {
             Authorization: auth,
