@@ -410,6 +410,61 @@
         box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
       }
 
+      .effect-segments {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--border-soft);
+        border-radius: 11px;
+        background: #eef1f6;
+      }
+
+      .effect-segments label {
+        position: relative;
+        margin: 0;
+        cursor: pointer;
+      }
+
+      .effect-segments input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .effect-segments span {
+        display: block;
+        padding: 9px 12px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        color: var(--muted);
+        font-family: var(--font-ui);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0;
+        text-align: center;
+        text-transform: none;
+      }
+
+      .effect-segments input:checked + span {
+        border-color: rgba(13, 148, 136, 0.35);
+        background: #ffffff;
+        color: var(--accent);
+        box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+      }
+
+      .effect-segments input:focus-visible + span {
+        outline: 3px solid rgba(13, 148, 136, 0.14);
+        outline-offset: 1px;
+      }
+
+      .effect-segments input:disabled + span {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
       input[type="file"] {
         cursor: pointer;
       }
@@ -670,57 +725,62 @@
   </head>
   <body>
     <main>
-      <div class="toolbar" style="display: flex; justify-content: flex-end">
-        <label for="language" style="margin: 0" data-i18n="language.label">语言</label>
-        <select id="language" aria-label="Language" style="width: auto; margin-left: 8px">
-          <option value="zh">中文</option>
-          <option value="en">English</option>
-        </select>
-      </div>
-
       <h1 data-i18n="page.title">实时编辑直播流 Demo</h1>
-      <p class="hint" data-i18n-html="page.hint">
-        页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。点击「创建并连接」后，请允许浏览器使用摄像头和麦克风。<br />
-        Cloudflare Worker 会使用你填写的 API Key 创建 Vidu 会话；之后浏览器会使用短期凭证直接连接 Vidu。
-      </p>
 
       <div class="layout">
         <section class="card">
-          <label for="environment" data-i18n="field.environment">环境</label>
-          <select id="environment">
-            <option value="cn" data-i18n="environment.cn">国内</option>
-            <option value="ovs" selected data-i18n="environment.ovs">海外</option>
-          </select>
-          <div class="field-hint" data-i18n-html="field.environmentHint">
-            会话创建请求会通过同源 Cloudflare Worker 转发到所选区域的 Vidu API。
+          <div class="actions">
+            <button id="joinBtn" data-i18n="button.join">创建并连接</button>
+            <button id="hangupBtn" class="danger" disabled data-i18n="button.hangup">挂断</button>
+          </div>
+          <div class="status-row">
+            <span id="apiStatus" class="pill warn">API idle</span>
+            <span id="wsStatus" class="pill warn">WS idle</span>
+            <span id="rtcStatus" class="pill warn">RTC idle</span>
           </div>
 
-          <label for="authToken">API Key（vda_...）</label>
+          <label data-i18n="field.provider">提供商</label>
+          <div class="effect-segments" role="radiogroup" aria-label="Provider">
+            <label>
+              <input type="radio" name="provider" value="vidu" checked />
+              <span>Vidu</span>
+            </label>
+            <label>
+              <input type="radio" name="provider" value="decart" />
+              <span>Decart</span>
+            </label>
+          </div>
+
+          <label id="authTokenLabel" for="authToken">Vidu API Key（vda_...）</label>
           <input id="authToken" placeholder="vda_..." autocomplete="off" />
-          <div class="field-hint" data-i18n="field.apiKeyHint">仅保存在当前浏览器的本地存储中。</div>
+          <div id="apiKeyHint" class="field-hint" data-i18n="field.apiKeyHint">仅保存在当前浏览器的本地存储中。</div>
 
           <label data-i18n="field.referenceImage">参考图（编辑用，必填）</label>
           <div class="img-tabs">
-            <button type="button" class="img-tab active" data-itab="url" data-i18n="tab.imageUrl">图片 URL</button>
+            <button type="button" class="img-tab" data-itab="url" data-i18n="tab.imageUrl">图片 URL</button>
             <button type="button" class="img-tab" data-itab="file" data-i18n="tab.imageFile">本地选图</button>
-            <button type="button" class="img-tab" data-itab="sample" data-i18n="tab.sampleCharacter">示例角色</button>
+            <button type="button" class="img-tab active" data-itab="sample" data-i18n="tab.sampleCharacter">示例角色</button>
           </div>
-          <input id="imageUrl" placeholder="https://example.com/reference.png" spellcheck="false" data-pane="url" />
+          <input id="imageUrl" placeholder="https://example.com/reference.png" spellcheck="false" data-pane="url" style="display: none" />
           <div data-pane="file" style="display: none">
             <input id="imageFile" type="file" accept="image/*" />
           </div>
-          <div data-pane="sample" style="display: none">
+          <div data-pane="sample">
             <div id="samplePicker" class="sample-picker"></div>
           </div>
           <img id="imagePreview" class="img-preview" alt="preview" />
 
-          <label for="editingType" data-i18n="field.editingType">编辑场景（editing_type）</label>
-          <select id="editingType">
-            <option value="style_transfer" selected data-i18n="editing.styleTransfer">风格迁移</option>
-            <option value="virtual_tryon" data-i18n="editing.virtualTryon">虚拟试穿</option>
-            <option value="subject_replacement" data-i18n="editing.subjectReplacement">主体替换</option>
-            <option value="background_replacement" data-i18n="editing.backgroundReplacement">背景替换</option>
-          </select>
+          <label data-i18n="field.editingType">编辑效果</label>
+          <div class="effect-segments" role="radiogroup" aria-label="Editing effect">
+            <label>
+              <input type="radio" name="editingType" value="style_transfer" checked />
+              <span data-i18n="editing.style">风格</span>
+            </label>
+            <label>
+              <input type="radio" name="editingType" value="subject_replacement" />
+              <span data-i18n="editing.subject">主体</span>
+            </label>
+          </div>
 
           <label for="videoSource" data-i18n="field.videoSource">视频输入</label>
           <select id="videoSource">
@@ -741,46 +801,44 @@
               <input id="segmentationBackgroundColor" type="color" value="#ffffff" disabled />
             </label>
           </div>
-
-          <div class="actions">
-            <button id="joinBtn" data-i18n="button.join">创建并连接</button>
-            <button id="hangupBtn" class="danger" disabled data-i18n="button.hangup">挂断</button>
+          <div class="segmentation-controls">
+            <label for="syncComparisonRecording">
+              <input id="syncComparisonRecording" type="checkbox" checked />
+              <span data-i18n="field.syncComparisonRecording">同步保存的视频</span>
+            </label>
+            <span id="syncComparisonRecordingHint" class="field-hint" style="margin: 0" data-i18n="field.syncComparisonRecordingHint">将保存视频中的输入延迟约 1.05 秒。</span>
           </div>
+
           <button id="clearBtn" class="secondary" style="margin-top: 8px" data-i18n="button.clearLog">清空日志</button>
 
-          <div class="status-row">
-            <span id="apiStatus" class="pill warn">API idle</span>
-            <span id="wsStatus" class="pill warn">WS idle</span>
-            <span id="rtcStatus" class="pill warn">RTC idle</span>
-          </div>
           <div id="mediaNotice" class="notice"></div>
 
-          <h2 style="font-size: 16px" data-i18n="section.switchPrompt">更换参考图</h2>
-          <label data-i18n="field.switchImage">新参考图（可选）</label>
-          <div class="img-tabs">
-            <button type="button" class="img-tab active" data-itab="sw-none" data-i18n="tab.keepImage">不换图</button>
-            <button type="button" class="img-tab" data-itab="sw-url" data-i18n="tab.imageUrl">图片 URL</button>
-            <button type="button" class="img-tab" data-itab="sw-file" data-i18n="tab.imageFile">本地选图</button>
-            <button type="button" class="img-tab" data-itab="sw-sample" data-i18n="tab.sampleCharacter">示例角色</button>
-          </div>
-          <input id="swImageUrl" placeholder="https://example.com/new-reference.png" spellcheck="false" data-pane="sw-url" style="display: none" />
-          <div data-pane="sw-file" style="display: none">
-            <input id="swImageFile" type="file" accept="image/*" />
-          </div>
-          <div data-pane="sw-sample" style="display: none">
-            <div id="swSamplePicker" class="sample-picker"></div>
-          </div>
-          <img id="swImagePreview" class="img-preview" alt="preview" />
+          <div id="switchPromptOptions" hidden>
+            <h2 style="font-size: 16px" data-i18n="section.switchPrompt">更换参考图</h2>
+            <label data-i18n="field.switchImage">新参考图（可选）</label>
+            <div class="img-tabs">
+              <button type="button" class="img-tab active" data-itab="sw-none" data-i18n="tab.keepImage">不换图</button>
+              <button type="button" class="img-tab" data-itab="sw-url" data-i18n="tab.imageUrl">图片 URL</button>
+              <button type="button" class="img-tab" data-itab="sw-file" data-i18n="tab.imageFile">本地选图</button>
+              <button type="button" class="img-tab" data-itab="sw-sample" data-i18n="tab.sampleCharacter">示例角色</button>
+            </div>
+            <input id="swImageUrl" placeholder="https://example.com/new-reference.png" spellcheck="false" data-pane="sw-url" style="display: none" />
+            <div data-pane="sw-file" style="display: none">
+              <input id="swImageFile" type="file" accept="image/*" />
+            </div>
+            <div data-pane="sw-sample" style="display: none">
+              <div id="swSamplePicker" class="sample-picker"></div>
+            </div>
+            <img id="swImagePreview" class="img-preview" alt="preview" />
 
-          <label for="swEditingType" data-i18n="field.switchEditingType">新编辑场景</label>
-          <select id="swEditingType">
-            <option value="style_transfer" selected data-i18n="editing.styleTransfer">风格迁移</option>
-            <option value="virtual_tryon" data-i18n="editing.virtualTryon">虚拟试穿</option>
-            <option value="subject_replacement" data-i18n="editing.subjectReplacement">主体替换</option>
-            <option value="background_replacement" data-i18n="editing.backgroundReplacement">背景替换</option>
-          </select>
-          <div class="actions" style="grid-template-columns: 1fr">
-            <button id="switchBtn" class="secondary" disabled data-i18n="button.switchPrompt">发送 switch_prompt</button>
+            <label for="swEditingType" data-i18n="field.switchEditingType">新编辑场景</label>
+            <select id="swEditingType">
+              <option value="style_transfer" selected data-i18n="editing.styleTransfer">风格迁移</option>
+              <option value="subject_replacement" data-i18n="editing.subjectReplacement">主体替换</option>
+            </select>
+            <div class="actions" style="grid-template-columns: 1fr">
+              <button id="switchBtn" class="secondary" disabled data-i18n="button.switchPrompt">发送 switch_prompt</button>
+            </div>
           </div>
 
           <div style="margin-top: 12px">
@@ -803,7 +861,7 @@
               </div>
             </div>
             <div class="video-box">
-              <div class="video-title" data-i18n="video.renderStream">实时编辑合成结果（render_uid）</div>
+              <div id="remoteVideoTitle" class="video-title" data-i18n="video.renderStream">实时编辑合成结果（render_uid）</div>
               <div id="remoteVideoContainer" class="video-stage"></div>
             </div>
           </div>
@@ -832,14 +890,17 @@
       const segmentationCanvas = $("#segmentationCanvas");
       const comparisonRecordingCanvas = $("#comparisonRecordingCanvas");
 
-      const environments = {
-        cn: { apiEnv: "cn", wsBase: "wss://api.vidu.cn" },
-        ovs: { apiEnv: "ovs", wsBase: "wss://api.vidu.com" },
-      };
+      const globalWsBase = "wss://api.vidu.com";
+      const sessionLimitMs = 10_000;
+      const recordingInputDelayMs = 1_050;
+      const falClientCdnUrl = "https://cdn.jsdelivr.net/npm/@fal-ai/client@1.10.1/+esm";
+      const decartEndpoint = "decart/lucy-2-5/realtime";
 
       const fallbackLanguage = "zh";
       const languageStorageKey = "streamQuickStartLanguage";
-      const apiKeyStorageKey = "viduS2ApiKey";
+      const viduApiKeyStorageKey = "viduS2ApiKey";
+      const falApiKeyStorageKey = "falApiKey";
+      const defaultSamplePath = "sample-characters/somake-anime.jpg";
       const sampleCharacters = [
         { label: "Pixar Woman", path: "sample-characters/233708121-a-female-character-in-a-pixar-style-design-is-featured-in-this-full-body-shot-set-against-a-white.jpg" },
         { label: "Relaxed Woman", path: "sample-characters/animated-woman-character-leaning-against-wall-relaxed-white-backdrop_1260728-14983.avif" },
@@ -851,6 +912,8 @@
         { label: "Pixar Man", path: "sample-characters/pixar-style-d-male-character-depicted-photo-showcasing-full-body-view-character-placed-against-white-310480030.webp" },
         { label: "Pixar Portrait", path: "sample-characters/pixar.jpg" },
         { label: "Somake Anime", path: "sample-characters/somake-anime.jpg" },
+        { label: "Low Poly Leo", path: "sample-characters/low-poly-leo.jpeg" },
+        { label: "Low Poly Woman", path: "sample-characters/low-poly-woman.jpg" },
       ];
       const translations = {
         zh: {
@@ -862,20 +925,28 @@
           "field.environment": "环境",
           "field.environmentHint": "会话创建请求会通过同源 Cloudflare Worker 转发到所选区域的 Vidu API。",
           "field.apiKeyHint": "仅保存在当前浏览器的本地存储中。清空此字段会删除已保存的密钥。",
+          "field.provider": "提供商",
+          "field.viduApiKey": "Vidu API Key（vda_...）",
+          "field.falApiKey": "fal.ai API Key",
           "field.referenceImage": "参考图（编辑用，必填）",
-          "field.editingType": "编辑场景（editing_type）",
+          "field.editingType": "编辑效果",
           "field.videoSource": "视频输入",
           "field.videoFileHint": "连接后视频会自动循环播放并作为编辑输入；不会使用摄像头或麦克风。",
           "field.enableSegmentation": "移除背景",
           "field.backgroundColor": "背景色",
+          "field.syncComparisonRecording": "同步保存的视频",
+          "field.syncComparisonRecordingHint": "将保存视频中的输入延迟约 1.05 秒。",
+          "field.decartSyncComparisonRecordingHint": "Decart 使用低延迟 WebRTC，不应用 Vidu 的输入延迟。",
           "videoSource.camera": "摄像头 + 麦克风",
           "videoSource.file": "上传的视频",
           "field.switchPrompt": "更换参考图",
           "field.switchImage": "新参考图（可选）",
           "field.switchEditingType": "新编辑场景",
           "editing.styleTransfer": "风格迁移",
+          "editing.style": "风格",
           "editing.virtualTryon": "虚拟试穿",
           "editing.subjectReplacement": "主体替换",
+          "editing.subject": "主体",
           "editing.backgroundReplacement": "背景替换",
           "tab.imageUrl": "图片 URL",
           "tab.imageFile": "本地选图",
@@ -890,6 +961,7 @@
           "section.eventLog": "事件日志",
           "video.localPreview": "本地预览（编辑输入）",
           "video.renderStream": "实时编辑合成结果（render_uid）",
+          "video.decartResult": "Decart 实时编辑结果",
           "session.empty": "尚未创建直播流",
           "status.apiIdle": "API idle",
           "status.apiCreating": "API creating",
@@ -990,20 +1062,28 @@
           "field.environment": "Environment",
           "field.environmentHint": "The session-creation request is forwarded to the selected Vidu region by the same-origin Cloudflare Worker.",
           "field.apiKeyHint": "Stored only in this browser's local storage. Clear the field to delete the saved key.",
+          "field.provider": "Provider",
+          "field.viduApiKey": "Vidu API Key (vda_...)",
+          "field.falApiKey": "fal.ai API Key",
           "field.referenceImage": "Reference image (required)",
-          "field.editingType": "Editing scene (editing_type)",
+          "field.editingType": "Effect",
           "field.videoSource": "Video input",
           "field.videoFileHint": "The video loops automatically and becomes the editing input after connecting; the camera and microphone are not used.",
           "field.enableSegmentation": "Remove background",
           "field.backgroundColor": "Background",
+          "field.syncComparisonRecording": "Sync saved comparison",
+          "field.syncComparisonRecordingHint": "Delays its input by about 1.05 seconds.",
+          "field.decartSyncComparisonRecordingHint": "Decart uses low-latency WebRTC; the Vidu input delay is not applied.",
           "videoSource.camera": "Camera + microphone",
           "videoSource.file": "Uploaded video",
           "field.switchPrompt": "Switch reference image",
           "field.switchImage": "New reference image (optional)",
           "field.switchEditingType": "New editing scene",
           "editing.styleTransfer": "Style transfer",
+          "editing.style": "Style",
           "editing.virtualTryon": "Virtual try-on",
           "editing.subjectReplacement": "Subject replacement",
+          "editing.subject": "Subject",
           "editing.backgroundReplacement": "Background replacement",
           "tab.imageUrl": "Image URL",
           "tab.imageFile": "Local file",
@@ -1018,6 +1098,7 @@
           "section.eventLog": "Event Log",
           "video.localPreview": "Local Preview (editing input)",
           "video.renderStream": "Live editing result (render_uid)",
+          "video.decartResult": "Decart live editing result",
           "session.empty": "No live stream created yet",
           "status.apiIdle": "API idle",
           "status.apiCreating": "API creating",
@@ -1135,7 +1216,11 @@
         if (sessionData.dataset.emptySession === "true") {
           sessionData.textContent = t("session.empty");
         }
-        $("#language").value = state.language;
+        const languageSelect = $("#language");
+        if (languageSelect) {
+          languageSelect.value = state.language;
+        }
+        updateProviderUi();
         if (persist) {
           window.localStorage.setItem(languageStorageKey, state.language);
         }
@@ -1159,8 +1244,15 @@
         seqId: 1,
         appSocket: undefined,
         aliRtcEngine: undefined,
+        activeProvider: undefined,
+        falModulePromise: undefined,
+        falConnection: undefined,
+        decartPeerConnection: undefined,
+        decartInputStream: undefined,
         remoteVideoElMap: new Map(),
         connInitRetryTimer: undefined,
+        autoHangupTimer: undefined,
+        inputDelayBuffer: undefined,
         videoObjectUrl: "",
         uploadedCaptureStream: undefined,
         uploadedVideoDrawFrame: undefined,
@@ -1233,18 +1325,35 @@
       }
 
       function sessionUrl() {
-        const env = environments[$("#environment").value] ?? environments.ovs;
-        return `/api/session?env=${encodeURIComponent(env.apiEnv)}`;
+        return "/api/session?env=ovs";
       }
 
       function wsUrl(path, query) {
-        const env = environments[$("#environment").value] ?? environments.ovs;
-        return `${env.wsBase}${path}?${query}`;
+        return `${globalWsBase}${path}?${query}`;
+      }
+
+      function selectedProvider() {
+        return document.querySelector('input[name="provider"]:checked')?.value || "vidu";
+      }
+
+      function selectedApiKeyStorageKey() {
+        return selectedProvider() === "decart" ? falApiKeyStorageKey : viduApiKeyStorageKey;
+      }
+
+      function updateProviderUi() {
+        const isDecart = selectedProvider() === "decart";
+        $("#authTokenLabel").textContent = t(isDecart ? "field.falApiKey" : "field.viduApiKey");
+        $("#authToken").placeholder = isDecart ? "fal key" : "vda_...";
+        $("#syncComparisonRecording").disabled = isDecart;
+        $("#syncComparisonRecordingHint").textContent = t(
+          isDecart ? "field.decartSyncComparisonRecordingHint" : "field.syncComparisonRecordingHint",
+        );
+        $("#remoteVideoTitle").textContent = t(isDecart ? "video.decartResult" : "video.renderStream");
       }
 
       function restoreApiKey() {
         try {
-          $("#authToken").value = window.localStorage.getItem(apiKeyStorageKey) || "";
+          $("#authToken").value = window.localStorage.getItem(selectedApiKeyStorageKey()) || "";
         } catch (_error) {
           // Storage can be unavailable in restrictive or private browser modes.
         }
@@ -1253,10 +1362,11 @@
       function persistApiKey() {
         try {
           const apiKey = stripAuthPrefix($("#authToken").value);
+          const storageKey = selectedApiKeyStorageKey();
           if (apiKey) {
-            window.localStorage.setItem(apiKeyStorageKey, apiKey);
+            window.localStorage.setItem(storageKey, apiKey);
           } else {
-            window.localStorage.removeItem(apiKeyStorageKey);
+            window.localStorage.removeItem(storageKey);
           }
         } catch (_error) {
           // The form remains usable even when persistent browser storage is unavailable.
@@ -1403,6 +1513,12 @@
           });
           picker.appendChild(button);
         }
+      }
+
+      function selectDefaultSample() {
+        const button = [...$("#samplePicker").querySelectorAll(".sample-character")]
+          .find((item) => item.dataset.samplePath === defaultSamplePath);
+        button?.click();
       }
 
       async function waitForActiveSample(groupPrefix) {
@@ -1886,7 +2002,7 @@
         }
         const body = {
           image_url: image,
-          editing_type: $("#editingType").value,
+          editing_type: document.querySelector('input[name="editingType"]:checked')?.value || "style_transfer",
         };
 
         setStatus("#apiStatus", "status.apiCreating", "warn");
@@ -1912,6 +2028,224 @@
         sessionData.dataset.emptySession = "false";
         setStatus("#apiStatus", "status.apiLive", "ok", { id: state.live.id });
         log(t("log.streamCreated"), { live_id: state.live.id, render_uid: state.renderUid });
+      }
+
+      function selectedEditingType() {
+        return document.querySelector('input[name="editingType"]:checked')?.value || "style_transfer";
+      }
+
+      function decartPrompt() {
+        if (selectedEditingType() === "subject_replacement") {
+          return "Replace the main subject with the character in the reference image while preserving the original motion, pose, lighting, and background.";
+        }
+        return "Change the style of the video to a high-quality anime illustration matching the reference image while preserving the original motion and composition.";
+      }
+
+      async function normalizeDecartReferenceImage(imageValue) {
+        if (!imageValue.startsWith("data:")) return imageValue;
+        const image = new Image();
+        image.src = imageValue;
+        await image.decode();
+        if (image.naturalWidth >= 512 && image.naturalHeight >= 512) return imageValue;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 512;
+        const context = canvas.getContext("2d", { alpha: false });
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, 512, 512);
+        const scale = Math.min(512 / image.naturalWidth, 512 / image.naturalHeight);
+        const width = image.naturalWidth * scale;
+        const height = image.naturalHeight * scale;
+        context.drawImage(image, (512 - width) / 2, (512 - height) / 2, width, height);
+        return canvas.toDataURL("image/jpeg", 0.92);
+      }
+
+      async function loadFalClient() {
+        if (!state.falModulePromise) {
+          state.falModulePromise = import(falClientCdnUrl).catch((error) => {
+            state.falModulePromise = undefined;
+            throw error;
+          });
+        }
+        return state.falModulePromise;
+      }
+
+      async function prepareDecartInputStream() {
+        const useUploadedVideo = isUploadedVideoSelected();
+        const useSegmentation = isSegmentationEnabled();
+        let stream;
+
+        if (useUploadedVideo) {
+          if (useSegmentation) {
+            await prepareUploadedVideoElement();
+            await startSegmentationProcessing(uploadedVideoSource);
+            stream = state.segmentedCaptureStream;
+          } else {
+            await prepareUploadedVideoCapture();
+            stream = state.uploadedCaptureStream;
+          }
+        } else if (useSegmentation) {
+          state.segmentationRawStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+            audio: false,
+          });
+          segmentationVideoSource.srcObject = state.segmentationRawStream;
+          await segmentationVideoSource.play();
+          await waitForVideoReady(segmentationVideoSource);
+          await startSegmentationProcessing(segmentationVideoSource);
+          stream = state.segmentedCaptureStream;
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+            audio: false,
+          });
+        }
+
+        if (!stream?.getVideoTracks().length) {
+          throw new Error(t("error.videoTrackMissing"));
+        }
+        state.decartInputStream = stream;
+        localPreviewer.pause();
+        localPreviewer.removeAttribute("src");
+        localPreviewer.srcObject = stream;
+        await localPreviewer.play();
+        return stream;
+      }
+
+      function attachDecartRemoteStream(stream) {
+        const key = "camera_decart";
+        let video = state.remoteVideoElMap.get(key);
+        if (!video) {
+          video = document.createElement("video");
+          video.autoplay = true;
+          video.playsInline = true;
+          video.muted = true;
+          video.dataset.uid = "decart";
+          remoteVideoContainer.textContent = "";
+          remoteVideoContainer.appendChild(video);
+          state.remoteVideoElMap.set(key, video);
+          const startRecording = () => tryStartRemoteRecording(video);
+          video.addEventListener("loadedmetadata", startRecording, { once: true });
+          video.addEventListener("playing", startRecording, { once: true });
+        }
+        video.srcObject = stream;
+        video.play().then(() => tryStartRemoteRecording(video)).catch(() => log(t("log.remoteAutoplayFailed")));
+      }
+
+      async function startDecartSession() {
+        const apiKey = stripAuthPrefix($("#authToken").value);
+        if (!apiKey) throw new Error(t("error.apiKeyRequired"));
+        await waitForActiveSample("");
+        const selectedReferenceImage = activeImageValue("");
+        if (!selectedReferenceImage) throw new Error(t("error.imageRequired"));
+        const referenceImage = await normalizeDecartReferenceImage(selectedReferenceImage);
+
+        state.activeProvider = "decart";
+        const prompt = decartPrompt();
+        const inputStream = await prepareDecartInputStream();
+        const { fal } = await loadFalClient();
+        fal.config({ credentials: apiKey });
+
+        const sessionId = `decart-${Date.now()}`;
+        state.live = { id: sessionId };
+        sessionData.dataset.emptySession = "false";
+        sessionData.textContent = JSON.stringify({
+          provider: "Decart via fal.ai",
+          endpoint: decartEndpoint,
+          prompt,
+          reference_image: referenceImage.startsWith("data:") ? "data URI" : referenceImage,
+        }, null, 2);
+        setStatus("#apiStatus", "status.apiCreating", "warn");
+        setStatus("#wsStatus", "status.wsConnecting", "warn");
+        setStatus("#rtcStatus", "status.rtcJoining", "warn");
+        startInputDelayBuffer();
+
+        await new Promise((resolve, reject) => {
+          let settled = false;
+          const timeout = window.setTimeout(() => {
+            if (!settled) {
+              settled = true;
+              reject(new Error("Decart connection timed out"));
+            }
+          }, 9_000);
+          const fail = (error) => {
+            const normalized = error instanceof Error ? error : new Error(error?.message || String(error));
+            if (!settled) {
+              settled = true;
+              window.clearTimeout(timeout);
+              reject(normalized);
+            } else {
+              log("Decart connection error", errorToJson(normalized));
+            }
+          };
+          const handleMessage = async (message) => {
+            const type = String(message?.type || "").toLowerCase();
+            if (type === "iceservers") {
+              if (state.decartPeerConnection) return;
+              const entries = message.iceservers ?? message.iceServers ?? message.ice_servers ?? [];
+              const peer = new RTCPeerConnection({
+                iceServers: entries.map((server) => ({
+                  urls: server.urls,
+                  username: server.username,
+                  credential: server.credential,
+                })),
+              });
+              state.decartPeerConnection = peer;
+              inputStream.getVideoTracks().forEach((track) => peer.addTrack(track, inputStream));
+              peer.ontrack = (event) => {
+                const remoteStream = event.streams[0] || new MediaStream([event.track]);
+                attachDecartRemoteStream(remoteStream);
+                setStatus("#apiStatus", "status.apiLive", "ok", { id: "Decart" });
+                setStatus("#wsStatus", "status.wsConnected", "ok");
+                setStatus("#rtcStatus", "status.rtcJoined", "ok");
+                if (!settled) {
+                  settled = true;
+                  window.clearTimeout(timeout);
+                  resolve();
+                }
+              };
+              peer.onicecandidate = (event) => {
+                if (!event.candidate) return;
+                state.falConnection?.send({
+                  type: "icecandidate",
+                  candidate: {
+                    candidate: event.candidate.candidate,
+                    sdpMid: event.candidate.sdpMid,
+                    sdpMLineIndex: event.candidate.sdpMLineIndex,
+                  },
+                });
+              };
+              peer.onconnectionstatechange = () => {
+                if (["failed", "closed"].includes(peer.connectionState) && !settled) {
+                  fail(new Error(`Decart WebRTC ${peer.connectionState}`));
+                }
+              };
+              const offer = await peer.createOffer();
+              await peer.setLocalDescription(offer);
+              state.falConnection?.send({ type: "offer", sdp: offer.sdp });
+            } else if (type === "answer" && state.decartPeerConnection && message.sdp) {
+              await state.decartPeerConnection.setRemoteDescription({ type: "answer", sdp: message.sdp });
+            } else if (type === "icecandidate" && state.decartPeerConnection && message.candidate) {
+              await state.decartPeerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+            } else if (type === "error") {
+              fail(new Error(`Decart: ${message.error || "unknown error"}`));
+            }
+          };
+
+          state.falConnection = fal.realtime.connect(decartEndpoint, {
+            connectionKey: sessionId,
+            throttleInterval: 0,
+            onResult: (message) => handleMessage(message).catch(fail),
+            onError: fail,
+          });
+          state.falConnection.send({
+            prompt,
+            reference_image_url: referenceImage,
+            enable_prompt_expansion: true,
+          });
+          scheduleAutoHangup();
+        });
       }
 
       function buildConnInitSignal() {
@@ -2265,13 +2599,76 @@
         );
       }
 
+      function stopInputDelayBuffer() {
+        const buffer = state.inputDelayBuffer;
+        if (!buffer) return;
+        if (buffer.timer) window.clearTimeout(buffer.timer);
+        buffer.frames.length = 0;
+        buffer.pool.length = 0;
+        state.inputDelayBuffer = undefined;
+      }
+
+      function startInputDelayBuffer() {
+        stopInputDelayBuffer();
+        if (state.activeProvider === "decart" || !$("#syncComparisonRecording").checked) return;
+
+        const frameRate = 30;
+        const frameIntervalMs = 1000 / frameRate;
+        const buffer = {
+          width: 640,
+          height: 360,
+          frames: [],
+          pool: [],
+          timer: undefined,
+          maxFrames: Math.ceil(recordingInputDelayMs / frameIntervalMs) + 4,
+        };
+        state.inputDelayBuffer = buffer;
+
+        const captureFrame = () => {
+          if (state.inputDelayBuffer !== buffer) return;
+          if (localPreviewer.videoWidth && localPreviewer.videoHeight && localPreviewer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            let canvas = buffer.pool.pop();
+            if (!canvas) {
+              canvas = document.createElement("canvas");
+              canvas.width = buffer.width;
+              canvas.height = buffer.height;
+            }
+            const context = canvas.getContext("2d", { alpha: false });
+            context.fillStyle = "#0b0f16";
+            context.fillRect(0, 0, buffer.width, buffer.height);
+            drawVideoContained(context, localPreviewer, 0, 0, buffer.width, buffer.height);
+            buffer.frames.push({ canvas, capturedAt: performance.now() });
+            while (buffer.frames.length > buffer.maxFrames) {
+              buffer.pool.push(buffer.frames.shift().canvas);
+            }
+          }
+          buffer.timer = window.setTimeout(captureFrame, frameIntervalMs);
+        };
+        captureFrame();
+      }
+
+      function delayedInputFrame(now = performance.now()) {
+        const frames = state.inputDelayBuffer?.frames;
+        if (!frames?.length) return undefined;
+        const targetTime = now - recordingInputDelayMs;
+        for (let index = frames.length - 1; index >= 0; index -= 1) {
+          if (frames[index].capturedAt <= targetTime) return frames[index].canvas;
+        }
+        return frames[0].canvas;
+      }
+
       function drawComparisonFrame(context, remoteVideo) {
         const width = comparisonRecordingCanvas.width;
         const height = comparisonRecordingCanvas.height;
         const panelWidth = width / 2;
         context.fillStyle = "#0b0f16";
         context.fillRect(0, 0, width, height);
-        drawVideoContained(context, localPreviewer, 0, 0, panelWidth, height);
+        const bufferedInput = delayedInputFrame();
+        if (bufferedInput) {
+          context.drawImage(bufferedInput, 0, 0, panelWidth, height);
+        } else {
+          drawVideoContained(context, localPreviewer, 0, 0, panelWidth, height);
+        }
         drawVideoContained(context, remoteVideo, panelWidth, 0, panelWidth, height);
         context.fillStyle = "rgba(11, 15, 22, 0.72)";
         context.fillRect(0, 0, panelWidth, 34);
@@ -2453,7 +2850,8 @@
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const liveId = String(state.live?.id || "session").replace(/[^a-zA-Z0-9_-]/g, "-");
         const extension = mimeType.includes("mp4") ? "mp4" : "webm";
-        return `vidu-input-output-${liveId}-${timestamp}.${extension}`;
+        const provider = state.activeProvider || selectedProvider();
+        return `${provider}-input-output-${liveId}-${timestamp}.${extension}`;
       }
 
       function downloadRecording(blob, mimeType) {
@@ -2559,13 +2957,39 @@
         $("#videoFile").disabled = disabled;
         $("#enableSegmentation").disabled = disabled;
         $("#segmentationBackgroundColor").disabled = !isSegmentationEnabled();
+        $("#syncComparisonRecording").disabled = disabled || selectedProvider() === "decart";
+        document.querySelectorAll('input[name="editingType"]').forEach((input) => {
+          input.disabled = disabled;
+        });
+        document.querySelectorAll('input[name="provider"]').forEach((input) => {
+          input.disabled = disabled;
+        });
+      }
+
+      function clearAutoHangupTimer() {
+        if (state.autoHangupTimer) {
+          window.clearTimeout(state.autoHangupTimer);
+          state.autoHangupTimer = undefined;
+        }
+      }
+
+      function scheduleAutoHangup() {
+        clearAutoHangupTimer();
+        state.autoHangupTimer = window.setTimeout(() => {
+          state.autoHangupTimer = undefined;
+          log("10-second session limit reached; hanging up automatically");
+          hangup().catch((error) => log(t("log.hangupFailed"), errorToJson(error)));
+        }, sessionLimitMs);
       }
 
       async function resetSessionState() {
+        clearAutoHangupTimer();
         clearConnInitRetry();
         closeAppSocket();
         await stopRemoteRecording();
+        stopInputDelayBuffer();
         await cleanupRtc();
+        state.activeProvider = undefined;
         state.live = null;
         state.rtc = null;
         state.clientSecret = "";
@@ -2588,7 +3012,17 @@
         state.appSocket = undefined;
       }
 
+      function cleanupDecart() {
+        state.falConnection?.close();
+        state.falConnection = undefined;
+        state.decartPeerConnection?.close();
+        state.decartPeerConnection = undefined;
+        state.decartInputStream?.getTracks().forEach((track) => track.stop());
+        state.decartInputStream = undefined;
+      }
+
       async function cleanupRtc() {
+        cleanupDecart();
         for (const key of [...state.remoteVideoElMap.keys()]) {
           const [type, userId] = key.split("_");
           removeRemoteVideo(userId, type);
@@ -2619,19 +3053,21 @@
         } catch (error) {
           log(t("error.recordingFailed"), errorToJson(error));
         }
-        try {
-          sendAppSignal(
-            {
-              type: 5,
-              live_id: String(state.live.id),
-              conn_id: state.connId,
-              seq_id: state.seqId++,
-              payload: { hangup: { hangup_reason: "user_hangup" } },
-            },
-            "App WS call_hangup",
-          );
-        } catch (error) {
-          log(t("log.hangupSignalFailed"), errorToJson(error));
+        if (state.activeProvider === "vidu") {
+          try {
+            sendAppSignal(
+              {
+                type: 5,
+                live_id: String(state.live.id),
+                conn_id: state.connId,
+                seq_id: state.seqId++,
+                payload: { hangup: { hangup_reason: "user_hangup" } },
+              },
+              "App WS call_hangup",
+            );
+          } catch (error) {
+            log(t("log.hangupSignalFailed"), errorToJson(error));
+          }
         }
         await resetSessionState();
         hangupBtn.disabled = true;
@@ -2656,42 +3092,23 @@
         };
       }
 
-      function applyQueryDefaults() {
-        const params = new URLSearchParams(window.location.search);
-        const fieldMap = {
-          env: "environment",
-        };
-        for (const [paramName, elementId] of Object.entries(fieldMap)) {
-          if (!params.has(paramName)) {
-            continue;
-          }
-          const el = $(`#${elementId}`);
-          if (!el) {
-            continue;
-          }
-          el.value = params.get(paramName);
-        }
-        if (params.size > 0) {
-          log(t("log.queryPrefilled"), {
-            env: $("#environment").value,
-          });
-        }
-      }
-
       /* ---------- 启动 ---------- */
       bindImageTabs("");
       bindImageTabs("sw");
       bindSamplePicker("");
       bindSamplePicker("sw");
+      selectDefaultSample();
       applyLanguage(detectInitialLanguage());
       restoreApiKey();
-      applyQueryDefaults();
       state.connId = newConnectionId();
 
       $("#authToken").addEventListener("input", persistApiKey);
-
-      $("#language").addEventListener("change", (event) => {
-        applyLanguage(event.target.value, { persist: true });
+      document.querySelectorAll('input[name="provider"]').forEach((input) => {
+        input.addEventListener("change", () => {
+          updateProviderUi();
+          restoreApiKey();
+          clearMediaNotice();
+        });
       });
 
       joinBtn.addEventListener("click", async () => {
@@ -2707,12 +3124,21 @@
         try {
           await state.localPreviewRefreshPromise.catch(() => {});
           await resetSessionState();
-          await createStream();
-          connectAppWebSocket();
-          log("waiting conn_init_ack (NOT_READY auto-retries)");
-          await waitForConnInitAck();
-          await joinAliRtc();
+          if (selectedProvider() === "decart") {
+            await startDecartSession();
+          } else {
+            state.activeProvider = "vidu";
+            await createStream();
+            scheduleAutoHangup();
+            connectAppWebSocket();
+            log("waiting conn_init_ack (NOT_READY auto-retries)");
+            await waitForConnInitAck();
+            startInputDelayBuffer();
+            await joinAliRtc();
+          }
         } catch (error) {
+          clearAutoHangupTimer();
+          stopInputDelayBuffer();
           log(t("log.startFailed"), errorToJson(error));
           setStatus("#apiStatus", "status.apiFailed", "warn");
           setStatus("#rtcStatus", "status.rtcFailed", "warn");
