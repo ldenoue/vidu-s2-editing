@@ -697,6 +697,7 @@
 
           <label for="authToken">API Key（vda_...）</label>
           <input id="authToken" placeholder="vda_..." autocomplete="off" />
+          <div class="field-hint" data-i18n="field.apiKeyHint">仅保存在当前浏览器的本地存储中。</div>
 
           <label data-i18n="field.referenceImage">参考图（编辑用，必填）</label>
           <div class="img-tabs">
@@ -838,6 +839,7 @@
 
       const fallbackLanguage = "zh";
       const languageStorageKey = "streamQuickStartLanguage";
+      const apiKeyStorageKey = "viduS2ApiKey";
       const sampleCharacters = [
         { label: "Pixar Woman", path: "sample-characters/233708121-a-female-character-in-a-pixar-style-design-is-featured-in-this-full-body-shot-set-against-a-white.jpg" },
         { label: "Relaxed Woman", path: "sample-characters/animated-woman-character-leaning-against-wall-relaxed-white-backdrop_1260728-14983.avif" },
@@ -859,6 +861,7 @@
           "environment.ovs": "海外",
           "field.environment": "环境",
           "field.environmentHint": "会话创建请求会通过同源 Cloudflare Worker 转发到所选区域的 Vidu API。",
+          "field.apiKeyHint": "仅保存在当前浏览器的本地存储中。清空此字段会删除已保存的密钥。",
           "field.referenceImage": "参考图（编辑用，必填）",
           "field.editingType": "编辑场景（editing_type）",
           "field.videoSource": "视频输入",
@@ -986,6 +989,7 @@
           "environment.ovs": "Global",
           "field.environment": "Environment",
           "field.environmentHint": "The session-creation request is forwarded to the selected Vidu region by the same-origin Cloudflare Worker.",
+          "field.apiKeyHint": "Stored only in this browser's local storage. Clear the field to delete the saved key.",
           "field.referenceImage": "Reference image (required)",
           "field.editingType": "Editing scene (editing_type)",
           "field.videoSource": "Video input",
@@ -1238,12 +1242,25 @@
         return `${env.wsBase}${path}?${query}`;
       }
 
-      function maskKey(value) {
-        const token = stripAuthPrefix(value);
-        if (!token) {
-          return "";
+      function restoreApiKey() {
+        try {
+          $("#authToken").value = window.localStorage.getItem(apiKeyStorageKey) || "";
+        } catch (_error) {
+          // Storage can be unavailable in restrictive or private browser modes.
         }
-        return `${token.slice(0, 8)}...`;
+      }
+
+      function persistApiKey() {
+        try {
+          const apiKey = stripAuthPrefix($("#authToken").value);
+          if (apiKey) {
+            window.localStorage.setItem(apiKeyStorageKey, apiKey);
+          } else {
+            window.localStorage.removeItem(apiKeyStorageKey);
+          }
+        } catch (_error) {
+          // The form remains usable even when persistent browser storage is unavailable.
+        }
       }
 
       async function parseJsonResponse(response, action) {
@@ -2643,8 +2660,6 @@
         const params = new URLSearchParams(window.location.search);
         const fieldMap = {
           env: "environment",
-          api_key: "authToken",
-          authorization: "authToken",
         };
         for (const [paramName, elementId] of Object.entries(fieldMap)) {
           if (!params.has(paramName)) {
@@ -2659,7 +2674,6 @@
         if (params.size > 0) {
           log(t("log.queryPrefilled"), {
             env: $("#environment").value,
-            api_key: $("#authToken").value ? maskKey($("#authToken").value) : "",
           });
         }
       }
@@ -2670,8 +2684,11 @@
       bindSamplePicker("");
       bindSamplePicker("sw");
       applyLanguage(detectInitialLanguage());
+      restoreApiKey();
       applyQueryDefaults();
       state.connId = newConnectionId();
+
+      $("#authToken").addEventListener("input", persistApiKey);
 
       $("#language").addEventListener("change", (event) => {
         applyLanguage(event.target.value, { persist: true });

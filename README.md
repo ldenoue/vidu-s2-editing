@@ -4,7 +4,7 @@ A Cloudflare Worker-hosted browser demo for Vidu S2 live video editing. It can s
 
 ## Architecture
 
-The Worker serves the page and implements one endpoint: `POST /api/session`. Each user supplies their own Vidu API key. The endpoint forwards that key and the session parameters to the selected Vidu API, then returns Vidu's response without storing the key. The browser uses the returned short-lived `client_secret` to connect directly to Vidu's WebSocket and uses AliRTC directly for video.
+The Worker serves the page and implements one endpoint: `POST /api/session`. Each user supplies their own Vidu API key, which is retained in that browser's local storage for convenience. The endpoint forwards that key and the session parameters to the selected Vidu API, then returns Vidu's response without storing the key server-side. The browser uses the returned short-lived `client_secret` to connect directly to Vidu's WebSocket and uses AliRTC directly for video.
 
 ## Run locally
 
@@ -34,6 +34,7 @@ Cloudflare serves everything in `public/` and runs `worker/index.js` first for A
 ## Security
 
 - Local environment files, Wrangler state, and dependencies are ignored by Git.
+- The user's Vidu API key is persisted only in the current browser's local storage and can be removed by clearing the API-key field.
 - The Worker does not log, persist, or bundle Vidu API keys; it only forwards a supplied key during session creation.
 - The subsequent browser WebSocket uses Vidu's short-lived `client_secret`, not the API key.
 - Never add a real API key to source code, screenshots, issues, or commits.
