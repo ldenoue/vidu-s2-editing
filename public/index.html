@@ -582,6 +582,43 @@
         cursor: pointer;
       }
 
+      .duration-control {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-soft);
+        border-radius: 9px;
+        background: #f8fafc;
+      }
+
+      .duration-control label {
+        margin: 0;
+        text-transform: none;
+        letter-spacing: 0;
+        font-family: var(--font-body);
+        font-size: 12px;
+      }
+
+      .duration-control input[type="range"] {
+        width: 100%;
+        padding: 0;
+        border: 0;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      .duration-control output {
+        min-width: 42px;
+        color: var(--accent);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 700;
+        text-align: right;
+      }
+
       .capture-source {
         position: fixed !important;
         inset: auto auto auto -10000px !important;
@@ -808,6 +845,11 @@
             </label>
             <span id="syncComparisonRecordingHint" class="field-hint" style="margin: 0" data-i18n="field.syncComparisonRecordingHint">将保存视频中的输入延迟约 1.05 秒。</span>
           </div>
+          <div class="duration-control">
+            <label for="sessionDuration" data-i18n="field.maxDuration">最长时长</label>
+            <input id="sessionDuration" type="range" min="5" max="30" step="1" value="10" />
+            <output id="sessionDurationValue" for="sessionDuration">10 s</output>
+          </div>
 
           <button id="clearBtn" class="secondary" style="margin-top: 8px" data-i18n="button.clearLog">清空日志</button>
 
@@ -891,7 +933,8 @@
       const comparisonRecordingCanvas = $("#comparisonRecordingCanvas");
 
       const globalWsBase = "wss://api.vidu.com";
-      const sessionLimitMs = 10_000;
+      const minSessionDurationSeconds = 5;
+      const maxSessionDurationSeconds = 30;
       const recordingInputDelayMs = 1_050;
       const falClientCdnUrl = "https://cdn.jsdelivr.net/npm/@fal-ai/client@1.10.1/+esm";
       const decartEndpoint = "decart/lucy-2-5/realtime";
@@ -937,6 +980,7 @@
           "field.syncComparisonRecording": "同步保存的视频",
           "field.syncComparisonRecordingHint": "将保存视频中的输入延迟约 1.05 秒。",
           "field.decartSyncComparisonRecordingHint": "Decart 使用低延迟 WebRTC，不应用 Vidu 的输入延迟。",
+          "field.maxDuration": "最长时长",
           "videoSource.camera": "摄像头 + 麦克风",
           "videoSource.file": "上传的视频",
           "field.switchPrompt": "更换参考图",
@@ -1074,6 +1118,7 @@
           "field.syncComparisonRecording": "Sync saved comparison",
           "field.syncComparisonRecordingHint": "Delays its input by about 1.05 seconds.",
           "field.decartSyncComparisonRecordingHint": "Decart uses low-latency WebRTC; the Vidu input delay is not applied.",
+          "field.maxDuration": "Max duration",
           "videoSource.camera": "Camera + microphone",
           "videoSource.file": "Uploaded video",
           "field.switchPrompt": "Switch reference image",
@@ -2964,6 +3009,19 @@
         document.querySelectorAll('input[name="provider"]').forEach((input) => {
           input.disabled = disabled;
         });
+        $("#sessionDuration").disabled = disabled;
+      }
+
+      function selectedSessionDurationSeconds() {
+        const value = Math.round(Number($("#sessionDuration").value));
+        return Math.min(maxSessionDurationSeconds, Math.max(minSessionDurationSeconds, value || 10));
+      }
+
+      function updateSessionDurationOutput() {
+        const seconds = selectedSessionDurationSeconds();
+        $("#sessionDuration").value = String(seconds);
+        $("#sessionDurationValue").value = `${seconds} s`;
+        $("#sessionDurationValue").textContent = `${seconds} s`;
       }
 
       function clearAutoHangupTimer() {
@@ -2975,11 +3033,12 @@
 
       function scheduleAutoHangup() {
         clearAutoHangupTimer();
+        const durationSeconds = selectedSessionDurationSeconds();
         state.autoHangupTimer = window.setTimeout(() => {
           state.autoHangupTimer = undefined;
-          log("10-second session limit reached; hanging up automatically");
+          log(`${durationSeconds}-second session limit reached; hanging up automatically`);
           hangup().catch((error) => log(t("log.hangupFailed"), errorToJson(error)));
-        }, sessionLimitMs);
+        }, durationSeconds * 1000);
       }
 
       async function resetSessionState() {
@@ -3100,9 +3159,11 @@
       selectDefaultSample();
       applyLanguage(detectInitialLanguage());
       restoreApiKey();
+      updateSessionDurationOutput();
       state.connId = newConnectionId();
 
       $("#authToken").addEventListener("input", persistApiKey);
+      $("#sessionDuration").addEventListener("input", updateSessionDurationOutput);
       document.querySelectorAll('input[name="provider"]').forEach((input) => {
         input.addEventListener("change", () => {
           updateProviderUi();
