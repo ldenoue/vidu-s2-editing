@@ -682,7 +682,7 @@
       <p class="hint" data-i18n-html="page.hint">
         Quick Start：<code>python3 quickstart.py --api-key vda_xxx</code><br />
         页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。点击「创建并连接」后，请允许浏览器使用摄像头和麦克风。<br />
-        内置代理转发 <code>/proxy/{env}/live/...</code>，避免浏览器跨域。
+        浏览器会使用你填写的 API Key 直接连接 Vidu；密钥不会经过本项目的服务器。
       </p>
 
       <div class="layout">
@@ -693,7 +693,7 @@
             <option value="ovs" selected data-i18n="environment.ovs">海外</option>
           </select>
           <div class="field-hint" data-i18n-html="field.environmentHint">
-            请求走 <code>/proxy/{env}/live/...</code>。通过 Python quick start 启动时会自动预填。
+            请求会直接发送到所选区域的 Vidu API。通过 Python quick start 启动时会自动预填。
           </div>
 
           <label for="authToken">API Key（vda_...）</label>
@@ -833,8 +833,8 @@
       const comparisonRecordingCanvas = $("#comparisonRecordingCanvas");
 
       const environments = {
-        cn: { proxyPrefix: "/proxy/cn" },
-        ovs: { proxyPrefix: "/proxy/ovs" },
+        cn: { apiBase: "https://api.vidu.cn", wsBase: "wss://api.vidu.cn" },
+        ovs: { apiBase: "https://api.vidu.com", wsBase: "wss://api.vidu.com" },
       };
 
       const fallbackLanguage = "zh";
@@ -853,12 +853,12 @@
       const translations = {
         zh: {
           "page.title": "实时编辑直播流 Demo",
-          "page.hint": "Quick Start：<code>python3 quickstart.py --api-key vda_xxx</code><br />页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。视频输入可使用摄像头，也可上传一段循环播放的视频。<br />内置代理转发 <code>/proxy/{env}/live/...</code>，避免浏览器跨域。",
+          "page.hint": "Quick Start：<code>python3 quickstart.py --api-key vda_xxx</code><br />页面会完成三步体验：创建直播流、建立 App WebSocket、加入 AliRTC 推流；之后可在运行中换参考图 / 换编辑场景。视频输入可使用摄像头，也可上传一段循环播放的视频。<br />浏览器会使用你填写的 API Key 直接连接 Vidu；密钥不会经过本项目的服务器。",
           "language.label": "语言",
           "environment.cn": "国内",
           "environment.ovs": "海外",
           "field.environment": "环境",
-          "field.environmentHint": "请求走 <code>/proxy/{env}/live/...</code>。通过 Python quick start 启动时会自动预填。",
+          "field.environmentHint": "请求会直接发送到所选区域的 Vidu API。通过 Python quick start 启动时会自动预填。",
           "field.referenceImage": "参考图（编辑用，必填）",
           "field.editingType": "编辑场景（editing_type）",
           "field.videoSource": "视频输入",
@@ -980,12 +980,12 @@
         },
         en: {
           "page.title": "Live Editing Stream Demo",
-          "page.hint": "Quick Start: <code>python3 quickstart.py --api-key vda_xxx</code><br />This page creates a live stream, opens the App WebSocket, and joins AliRTC. The video input can be your camera or an uploaded video that loops during the session. You can then switch the reference image or editing scene while live.<br />The built-in proxy forwards <code>/proxy/{env}/live/...</code> requests to avoid browser CORS issues.",
+          "page.hint": "Quick Start: <code>python3 quickstart.py --api-key vda_xxx</code><br />This page creates a live stream, opens the App WebSocket, and joins AliRTC. The video input can be your camera or an uploaded video that loops during the session. You can then switch the reference image or editing scene while live.<br />Your browser connects directly to Vidu using the API key you provide; the key does not pass through this project's server.",
           "language.label": "Language",
           "environment.cn": "China",
           "environment.ovs": "Global",
           "field.environment": "Environment",
-          "field.environmentHint": "Requests go through <code>/proxy/{env}/live/...</code>. Values are prefilled automatically when launched by Python quick start.",
+          "field.environmentHint": "Requests are sent directly to the Vidu API for the selected region. Values are prefilled automatically when launched by Python quick start.",
           "field.referenceImage": "Reference image (required)",
           "field.editingType": "Editing scene (editing_type)",
           "field.videoSource": "Video input",
@@ -1225,25 +1225,17 @@
 
       function httpAuthHeader(value) {
         const token = stripAuthPrefix(value);
-        if (!token) {
-          return "";
-        }
-        return token.startsWith("vda_") ? `Token ${token}` : `Token ${token}`;
-      }
-
-      function wsAuthQuery(value) {
-        return stripAuthPrefix(value);
+        return token;
       }
 
       function apiUrl(path) {
         const env = environments[$("#environment").value] ?? environments.ovs;
-        return `${env.proxyPrefix}${path}`;
+        return `${env.apiBase}${path}`;
       }
 
       function wsUrl(path, query) {
         const env = environments[$("#environment").value] ?? environments.ovs;
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        return `${protocol}//${window.location.host}${env.proxyPrefix}${path}?${query}`;
+        return `${env.wsBase}${path}?${query}`;
       }
 
       function maskKey(value) {
@@ -1939,20 +1931,21 @@
       }
 
       function connectAppWebSocket() {
-        const wsToken = wsAuthQuery($("#authToken").value);
-        if (!wsToken) {
-          throw new Error(t("error.apiKeyRequired"));
+        if (!state.clientSecret) {
+          throw new Error("Vidu did not return the client_secret required for a browser WebSocket connection");
         }
         const query = new URLSearchParams({
           live_id: String(state.live.id),
           conn_id: state.connId,
-          authorization: wsToken,
+          client_secret: state.clientSecret,
         });
-        if (state.clientSecret) {
-          query.set("client_secret", state.clientSecret);
-        }
         const url = wsUrl("/live/ws/live/connect", query);
-        log(t("log.connectAppWs"), { url: url.replace(wsToken, `${wsToken.slice(0, 8)}...`) });
+        const safeQuery = new URLSearchParams({
+          live_id: String(state.live.id),
+          conn_id: state.connId,
+          client_secret: "[redacted]",
+        });
+        log(t("log.connectAppWs"), { url: wsUrl("/live/ws/live/connect", safeQuery) });
         state.appSocket = new WebSocket(url);
         setStatus("#wsStatus", "status.wsConnecting", "warn");
 

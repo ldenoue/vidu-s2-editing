@@ -28,24 +28,25 @@ Then start the local server:
 python3 quickstart.py
 ```
 
-The server opens the demo in your browser. Global service endpoints are selected by default; use `python3 quickstart.py --env cn` if you specifically need the China region.
+The server opens the demo in your browser and prefills your local key. The browser then contacts Vidu directly. Global service endpoints are selected by default; use `python3 quickstart.py --env cn` if you specifically need the China region.
 
 ## GitHub Pages
 
 The static interface is published at [ldenoue.github.io/vidu-s2-editing](https://ldenoue.github.io/vidu-s2-editing/). Every push to `main` deploys through [the Pages workflow](.github/workflows/pages.yml).
 
-GitHub Pages cannot run the Python reverse proxy. The hosted page is therefore useful for viewing and testing the interface, but authenticated Vidu connections should be run locally with `quickstart.py`. The API key is not included in the Pages artifact or committed to this repository.
+The hosted page connects directly to Vidu over HTTPS, WebSocket, and AliRTC. Each user supplies their own API key in the form; the key is kept in that browser session and is not sent through infrastructure operated by this project.
 
 ## Security
 
 - `.env` and other local environment variants are ignored by Git.
 - `.env.example` documents the required variable without containing a key.
+- The GitHub Pages app uses the key only for the direct Vidu session-creation request. The subsequent browser WebSocket uses Vidu's short-lived `client_secret`.
 - Never add a real API key to source code, screenshots, issues, or commits.
 - If a key is ever committed, revoke it immediately and remove it from Git history.
 
 ## Main files
 
 - `index.html` — browser UI and live media pipeline
-- `quickstart.py` — local static server and authenticated Vidu HTTP/WebSocket proxy
+- `quickstart.py` — optional local static server and convenience launcher
 - `sample-characters/` — bundled character-picker images
 - `.github/workflows/pages.yml` — GitHub Pages deployment
