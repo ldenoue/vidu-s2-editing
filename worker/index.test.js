@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { createViduSession } from "./index.js";
+import { createViduSession, proxyViduWebSocket } from "./index.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -58,4 +58,38 @@ test("forwards the user's key and approved session fields to Vidu", async () => 
     image_url: "https://example.com/reference.png",
     editing_type: "style_transfer",
   });
+});
+
+test("proxies browser WebSockets to the matching Vidu environment without Origin", async () => {
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url: String(url), init };
+    return new Response("upstream rejected test credentials", { status: 401 });
+  };
+
+  const request = new Request(
+    "https://example.test/api/vidu/ws?env=ovs&live_id=live-test&conn_id=conn-test&client_secret=secret-test",
+    {
+      headers: {
+        Upgrade: "websocket",
+        Origin: "https://example.test",
+        "Sec-WebSocket-Key": "test-key",
+        "Sec-WebSocket-Version": "13",
+      },
+    },
+  );
+  const response = await proxyViduWebSocket(request);
+
+  assert.equal(response.status, 401);
+  assert.equal(
+    captured.url,
+    "https://api.vidu.com/live/ws/live/connect?live_id=live-test&conn_id=conn-test&client_secret=secret-test",
+  );
+  assert.equal(captured.init.headers.get("Origin"), null);
+  assert.equal(captured.init.headers.get("Upgrade"), "websocket");
+});
+
+test("rejects non-WebSocket requests to the WebSocket proxy", async () => {
+  const response = await proxyViduWebSocket(new Request("https://example.test/api/vidu/ws"));
+  assert.equal(response.status, 426);
 });

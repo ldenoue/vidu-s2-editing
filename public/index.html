@@ -932,7 +932,6 @@
       const segmentationCanvas = $("#segmentationCanvas");
       const comparisonRecordingCanvas = $("#comparisonRecordingCanvas");
 
-      const globalWsBase = "wss://api.vidu.com";
       const minSessionDurationSeconds = 5;
       const maxSessionDurationSeconds = 30;
       const recordingInputDelayMs = 1_050;
@@ -1088,6 +1087,7 @@
           "log.sampleImageLoaded": "示例角色已选择",
           "log.videoLoaded": "输入视频已加载",
           "log.videoInputReady": "已将上传的视频用作 AliRTC 输入",
+          "log.sessionTimerStarted": "收到首个远端视频帧，{durationSeconds} 秒会话计时开始",
           "log.segmentationReady": "MediaPipe 背景分割已启用",
           "log.segmentationStopped": "MediaPipe 背景分割已停止",
           "log.recordingStarted": "开始录制输入 / 输出对比画面",
@@ -1226,6 +1226,7 @@
           "log.sampleImageLoaded": "Sample character selected",
           "log.videoLoaded": "Input video loaded",
           "log.videoInputReady": "Uploaded video is ready as the AliRTC input",
+          "log.sessionTimerStarted": "First remote video frame received; {durationSeconds}-second session timer started",
           "log.segmentationReady": "MediaPipe background segmentation enabled",
           "log.segmentationStopped": "MediaPipe background segmentation stopped",
           "log.recordingStarted": "Started recording the input/output comparison",
@@ -1297,6 +1298,7 @@
         remoteVideoElMap: new Map(),
         connInitRetryTimer: undefined,
         autoHangupTimer: undefined,
+        remoteOutputStarted: false,
         inputDelayBuffer: undefined,
         videoObjectUrl: "",
         uploadedCaptureStream: undefined,
@@ -1373,8 +1375,9 @@
         return "/api/session?env=ovs";
       }
 
-      function wsUrl(path, query) {
-        return `${globalWsBase}${path}?${query}`;
+      function wsUrl(query) {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        return `${protocol}//${window.location.host}/api/vidu/ws?env=ovs&${query}`;
       }
 
       function selectedProvider() {
@@ -2175,6 +2178,7 @@
           video.addEventListener("playing", startRecording, { once: true });
         }
         video.srcObject = stream;
+        startTimerOnFirstRemoteFrame(video);
         video.play().then(() => tryStartRemoteRecording(video)).catch(() => log(t("log.remoteAutoplayFailed")));
       }
 
@@ -2289,7 +2293,6 @@
             reference_image_url: referenceImage,
             enable_prompt_expansion: true,
           });
-          scheduleAutoHangup();
         });
       }
 
@@ -2335,13 +2338,13 @@
           conn_id: state.connId,
           client_secret: state.clientSecret,
         });
-        const url = wsUrl("/live/ws/live/connect", query);
+        const url = wsUrl(query);
         const safeQuery = new URLSearchParams({
           live_id: String(state.live.id),
           conn_id: state.connId,
           client_secret: "[redacted]",
         });
-        log(t("log.connectAppWs"), { url: wsUrl("/live/ws/live/connect", safeQuery) });
+        log(t("log.connectAppWs"), { url: wsUrl(safeQuery) });
         state.appSocket = new WebSocket(url);
         setStatus("#wsStatus", "status.wsConnecting", "warn");
 
@@ -2973,6 +2976,7 @@
         remoteVideoContainer.textContent = "";
         remoteVideoContainer.appendChild(video);
         state.remoteVideoElMap.set(key, video);
+        startTimerOnFirstRemoteFrame(video);
         const startRecording = () => tryStartRemoteRecording(video);
         video.addEventListener("loadedmetadata", startRecording, { once: true });
         video.addEventListener("playing", startRecording, { once: true });
@@ -3034,11 +3038,39 @@
       function scheduleAutoHangup() {
         clearAutoHangupTimer();
         const durationSeconds = selectedSessionDurationSeconds();
+        log(t("log.sessionTimerStarted", { durationSeconds }));
         state.autoHangupTimer = window.setTimeout(() => {
           state.autoHangupTimer = undefined;
           log(`${durationSeconds}-second session limit reached; hanging up automatically`);
           hangup().catch((error) => log(t("log.hangupFailed"), errorToJson(error)));
         }, durationSeconds * 1000);
+      }
+
+      function startTimerOnFirstRemoteFrame(video) {
+        if (state.remoteOutputStarted || video.dataset.timerArmed === "true") return;
+        video.dataset.timerArmed = "true";
+
+        const startTimer = () => {
+          if (
+            state.remoteOutputStarted
+            || !state.live
+            || !video.isConnected
+            || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+            || !video.videoWidth
+            || !video.videoHeight
+          ) {
+            return;
+          }
+          state.remoteOutputStarted = true;
+          scheduleAutoHangup();
+        };
+
+        if (typeof video.requestVideoFrameCallback === "function") {
+          video.requestVideoFrameCallback(startTimer);
+          return;
+        }
+        video.addEventListener("loadeddata", startTimer, { once: true });
+        video.addEventListener("playing", startTimer, { once: true });
       }
 
       async function resetSessionState() {
@@ -3053,6 +3085,7 @@
         state.rtc = null;
         state.clientSecret = "";
         state.renderUid = "";
+        state.remoteOutputStarted = false;
         sessionData.dataset.emptySession = "true";
         sessionData.textContent = t("session.empty");
         clearMediaNotice();
@@ -3190,7 +3223,6 @@
           } else {
             state.activeProvider = "vidu";
             await createStream();
-            scheduleAutoHangup();
             connectAppWebSocket();
             log("waiting conn_init_ack (NOT_READY auto-retries)");
             await waitForConnInitAck();

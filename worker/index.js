@@ -90,6 +90,42 @@ export async function createViduSession(request) {
   });
 }
 
+export async function proxyViduWebSocket(request) {
+  if ((request.headers.get("Upgrade") || "").toLowerCase() !== "websocket") {
+    return json({ message: "A WebSocket upgrade is required" }, 426);
+  }
+
+  const requestUrl = new URL(request.url);
+  const environment = requestUrl.searchParams.get("env") || "ovs";
+  const viduOrigin = VIDU_ORIGINS[environment];
+  if (!viduOrigin) {
+    return json({ message: "Unknown Vidu environment" }, 400);
+  }
+
+  const liveId = requestUrl.searchParams.get("live_id");
+  const connId = requestUrl.searchParams.get("conn_id");
+  const clientSecret = requestUrl.searchParams.get("client_secret");
+  if (!liveId || !connId || !clientSecret) {
+    return json({ message: "live_id, conn_id, and client_secret are required" }, 400);
+  }
+
+  const upstreamUrl = new URL("/live/ws/live/connect", viduOrigin);
+  upstreamUrl.searchParams.set("live_id", liveId);
+  upstreamUrl.searchParams.set("conn_id", connId);
+  upstreamUrl.searchParams.set("client_secret", clientSecret);
+
+  const headers = new Headers(request.headers);
+  // Vidu authenticates this connection with client_secret. Do not forward the
+  // browser page's cross-origin identity, which some WebSocket gateways reject.
+  headers.delete("Origin");
+
+  try {
+    return await fetch(upstreamUrl, { headers });
+  } catch {
+    return json({ message: "Could not reach the Vidu WebSocket" }, 502);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -99,6 +135,10 @@ export default {
         return json({ message: "Method not allowed" }, 405);
       }
       return createViduSession(request);
+    }
+
+    if (url.pathname === "/api/vidu/ws") {
+      return proxyViduWebSocket(request);
     }
 
     return env.ASSETS.fetch(request);

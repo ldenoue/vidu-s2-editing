@@ -6,7 +6,7 @@ A Cloudflare Worker-hosted browser demo for Vidu S2 and Decart Lucy 2.5 live vid
 
 The Worker serves the page and implements `POST /api/session` for Vidu. Each user supplies their own provider key, retained separately in that browser's local storage for convenience.
 
-- Vidu session creation is forwarded through the Worker; the browser then uses the returned short-lived credential with Vidu's WebSocket and AliRTC.
+- Vidu session creation and the WebSocket handshake are forwarded through the Worker; the browser uses the returned short-lived credential for the proxied WebSocket and joins AliRTC directly.
 - Decart uses the official fal.ai browser client for signaling and a peer-to-peer WebRTC media connection to `decart/lucy-2-5/realtime`.
 
 ## Run locally
@@ -39,7 +39,7 @@ Cloudflare serves everything in `public/` and runs `worker/index.js` first for A
 - Local environment files, Wrangler state, and dependencies are ignored by Git.
 - Vidu and fal.ai keys are persisted separately in the current browser's local storage and can be removed by clearing the API-key field.
 - The Worker does not log, persist, or bundle Vidu API keys; it only forwards a supplied key during session creation.
-- The subsequent browser WebSocket uses Vidu's short-lived `client_secret`, not the API key.
+- The subsequent browser WebSocket proxy uses Vidu's short-lived `client_secret`, not the API key.
 - Never add a real API key to source code, screenshots, issues, or commits.
 - If a key is ever committed, revoke it immediately and remove it from Git history.
 
