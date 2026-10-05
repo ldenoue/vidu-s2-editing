@@ -3,6 +3,8 @@ const VIDU_ORIGINS = {
   ovs: "https://api.vidu.com",
 };
 
+const XMAX_TEMPORARY_KEY_URL = "https://api.xmax.ai/open/api/v1/temporary-api-key";
+
 const EDITING_TYPES = new Set([
   "style_transfer",
   "virtual_tryon",
@@ -126,6 +128,66 @@ export async function proxyViduWebSocket(request) {
   }
 }
 
+export async function createXmaxRealtimeKey(request) {
+  const apiKey = apiKeyFrom(request);
+  if (!apiKey.startsWith("uk-")) {
+    return json({ message: "A valid Xmax permanent API key is required" }, 401);
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ message: "Request body must be valid JSON" }, 400);
+  }
+  const requestedDuration = Math.round(Number(payload?.durationSeconds));
+  if (!Number.isFinite(requestedDuration) || requestedDuration < 5 || requestedDuration > 30) {
+    return json({ message: "durationSeconds must be between 5 and 30" }, 400);
+  }
+
+  let upstream;
+  try {
+    upstream = await fetch(XMAX_TEMPORARY_KEY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Key": apiKey,
+      },
+      body: JSON.stringify({
+        expireSeconds: requestedDuration + 120,
+        pointsLimit: requestedDuration + 30,
+      }),
+    });
+  } catch {
+    return json({ message: "Could not reach the Xmax API" }, 502);
+  }
+
+  const responseText = await upstream.text();
+  if (!upstream.ok) {
+    return new Response(responseText, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("Content-Type") || "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  let responsePayload;
+  try {
+    responsePayload = JSON.parse(responseText);
+  } catch {
+    return json({ message: "Xmax returned an invalid response" }, 502);
+  }
+  const temporaryApiKey = responsePayload?.data?.temporaryApiKey;
+  const expireTimestamp = responsePayload?.data?.expireTimestamp;
+  if (typeof temporaryApiKey !== "string" || !temporaryApiKey.startsWith("tk-")) {
+    return json({ message: "Xmax did not return a temporary API key" }, 502);
+  }
+
+  return json({ temporaryApiKey, expireTimestamp });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -139,6 +201,13 @@ export default {
 
     if (url.pathname === "/api/vidu/ws") {
       return proxyViduWebSocket(request);
+    }
+
+    if (url.pathname === "/api/xmax/realtime-key") {
+      if (request.method !== "POST") {
+        return json({ message: "Method not allowed" }, 405);
+      }
+      return createXmaxRealtimeKey(request);
     }
 
     return env.ASSETS.fetch(request);

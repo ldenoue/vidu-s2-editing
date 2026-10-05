@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { createViduSession, proxyViduWebSocket } from "./index.js";
+import { createViduSession, createXmaxRealtimeKey, proxyViduWebSocket } from "./index.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -92,4 +92,61 @@ test("proxies browser WebSockets to the matching Vidu environment without Origin
 test("rejects non-WebSocket requests to the WebSocket proxy", async () => {
   const response = await proxyViduWebSocket(new Request("https://example.test/api/vidu/ws"));
   assert.equal(response.status, 426);
+});
+
+test("exchanges an Xmax permanent key for a bounded temporary browser key", async () => {
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url: String(url), init };
+    return Response.json({
+      success: true,
+      data: {
+        temporaryApiKey: "tk-short-lived-test-key",
+        expireTimestamp: "2026-10-05T12:00:00.000+00:00",
+      },
+    });
+  };
+
+  const response = await createXmaxRealtimeKey(new Request("https://example.test/api/xmax/realtime-key", {
+    method: "POST",
+    headers: {
+      Authorization: "uk-permanent-test-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ durationSeconds: 10 }),
+  }));
+
+  assert.equal(response.status, 200);
+  assert.equal(captured.url, "https://api.xmax.ai/open/api/v1/temporary-api-key");
+  assert.equal(captured.init.headers["X-Api-Key"], "uk-permanent-test-key");
+  assert.deepEqual(JSON.parse(captured.init.body), {
+    expireSeconds: 130,
+    pointsLimit: 40,
+  });
+  assert.deepEqual(await response.json(), {
+    temporaryApiKey: "tk-short-lived-test-key",
+    expireTimestamp: "2026-10-05T12:00:00.000+00:00",
+  });
+});
+
+test("rejects malformed Xmax keys and excessive session durations", async () => {
+  const badKeyResponse = await createXmaxRealtimeKey(new Request("https://example.test/api/xmax/realtime-key", {
+    method: "POST",
+    headers: {
+      Authorization: "tk-not-a-permanent-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ durationSeconds: 10 }),
+  }));
+  assert.equal(badKeyResponse.status, 401);
+
+  const badDurationResponse = await createXmaxRealtimeKey(new Request("https://example.test/api/xmax/realtime-key", {
+    method: "POST",
+    headers: {
+      Authorization: "uk-permanent-test-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ durationSeconds: 300 }),
+  }));
+  assert.equal(badDurationResponse.status, 400);
 });
