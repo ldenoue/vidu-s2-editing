@@ -386,6 +386,28 @@
         background: #eef1f6;
       }
 
+      .reference-image-dropzone {
+        margin: 0 -8px;
+        padding: 0 8px 8px;
+        border: 1px dashed transparent;
+        border-radius: 12px;
+        transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      .reference-image-dropzone.drag-active {
+        border-color: var(--accent);
+        background: rgba(13, 148, 136, 0.08);
+        box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+      }
+
+      .drop-hint {
+        margin-top: 7px;
+        color: var(--muted);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-align: center;
+      }
+
       .img-tab {
         border: 1px solid transparent;
         background: transparent;
@@ -783,7 +805,7 @@
           <label data-i18n="field.provider">提供商</label>
           <div class="effect-segments provider-segments" role="radiogroup" aria-label="Provider">
             <label>
-              <input type="radio" name="provider" value="vidu" checked />
+              <input type="radio" name="provider" value="vidu" />
               <span>Vidu</span>
             </label>
             <label>
@@ -791,7 +813,7 @@
               <span>Decart</span>
             </label>
             <label>
-              <input type="radio" name="provider" value="xmax" />
+              <input type="radio" name="provider" value="xmax" checked />
               <span>Xmax</span>
             </label>
           </div>
@@ -800,20 +822,23 @@
           <input id="authToken" placeholder="vda_..." autocomplete="off" />
           <div id="apiKeyHint" class="field-hint" data-i18n="field.apiKeyHint">仅保存在当前浏览器的本地存储中。</div>
 
-          <label data-i18n="field.referenceImage">参考图（编辑用，必填）</label>
-          <div class="img-tabs">
-            <button type="button" class="img-tab" data-itab="url" data-i18n="tab.imageUrl">图片 URL</button>
-            <button type="button" class="img-tab" data-itab="file" data-i18n="tab.imageFile">本地选图</button>
-            <button type="button" class="img-tab active" data-itab="sample" data-i18n="tab.sampleCharacter">示例角色</button>
+          <div id="referenceImageDropzone" class="reference-image-dropzone">
+            <label data-i18n="field.referenceImage">参考图（编辑用，必填）</label>
+            <div class="img-tabs">
+              <button type="button" class="img-tab" data-itab="url" data-i18n="tab.imageUrl">图片 URL</button>
+              <button type="button" class="img-tab" data-itab="file" data-i18n="tab.imageFile">本地选图</button>
+              <button type="button" class="img-tab active" data-itab="sample" data-i18n="tab.sampleCharacter">示例角色</button>
+            </div>
+            <input id="imageUrl" placeholder="https://example.com/reference.png" spellcheck="false" data-pane="url" style="display: none" />
+            <div data-pane="file" style="display: none">
+              <input id="imageFile" type="file" accept="image/*" />
+            </div>
+            <div data-pane="sample">
+              <div id="samplePicker" class="sample-picker"></div>
+            </div>
+            <img id="imagePreview" class="img-preview" alt="preview" />
+            <div class="drop-hint" data-i18n="field.imageDropHint">或将图片拖放到这里</div>
           </div>
-          <input id="imageUrl" placeholder="https://example.com/reference.png" spellcheck="false" data-pane="url" style="display: none" />
-          <div data-pane="file" style="display: none">
-            <input id="imageFile" type="file" accept="image/*" />
-          </div>
-          <div data-pane="sample">
-            <div id="samplePicker" class="sample-picker"></div>
-          </div>
-          <img id="imagePreview" class="img-preview" alt="preview" />
 
           <label data-i18n="field.editingType">编辑效果</label>
           <div class="effect-segments" role="radiogroup" aria-label="Editing effect">
@@ -829,10 +854,10 @@
 
           <label for="videoSource" data-i18n="field.videoSource">视频输入</label>
           <select id="videoSource">
-            <option value="camera" selected data-i18n="videoSource.camera">摄像头 + 麦克风</option>
-            <option value="file" data-i18n="videoSource.file">上传的视频</option>
+            <option value="camera" data-i18n="videoSource.camera">摄像头 + 麦克风</option>
+            <option value="file" selected data-i18n="videoSource.file">上传的视频</option>
           </select>
-          <div id="videoFilePane" class="source-pane" style="display: none">
+          <div id="videoFilePane" class="source-pane">
             <input id="videoFile" type="file" accept="video/*" />
             <div class="field-hint" data-i18n="field.videoFileHint">连接后视频会自动循环播放并作为编辑输入；不会使用摄像头或麦克风。</div>
           </div>
@@ -865,21 +890,24 @@
 
           <div id="switchPromptOptions" hidden>
             <h2 style="font-size: 16px" data-i18n="section.switchPrompt">更换参考图</h2>
-            <label data-i18n="field.switchImage">新参考图（可选）</label>
-            <div class="img-tabs">
-              <button type="button" class="img-tab active" data-itab="sw-none" data-i18n="tab.keepImage">不换图</button>
-              <button type="button" class="img-tab" data-itab="sw-url" data-i18n="tab.imageUrl">图片 URL</button>
-              <button type="button" class="img-tab" data-itab="sw-file" data-i18n="tab.imageFile">本地选图</button>
-              <button type="button" class="img-tab" data-itab="sw-sample" data-i18n="tab.sampleCharacter">示例角色</button>
+            <div id="switchReferenceImageDropzone" class="reference-image-dropzone">
+              <label data-i18n="field.switchImage">新参考图（可选）</label>
+              <div class="img-tabs">
+                <button type="button" class="img-tab active" data-itab="sw-none" data-i18n="tab.keepImage">不换图</button>
+                <button type="button" class="img-tab" data-itab="sw-url" data-i18n="tab.imageUrl">图片 URL</button>
+                <button type="button" class="img-tab" data-itab="sw-file" data-i18n="tab.imageFile">本地选图</button>
+                <button type="button" class="img-tab" data-itab="sw-sample" data-i18n="tab.sampleCharacter">示例角色</button>
+              </div>
+              <input id="swImageUrl" placeholder="https://example.com/new-reference.png" spellcheck="false" data-pane="sw-url" style="display: none" />
+              <div data-pane="sw-file" style="display: none">
+                <input id="swImageFile" type="file" accept="image/*" />
+              </div>
+              <div data-pane="sw-sample" style="display: none">
+                <div id="swSamplePicker" class="sample-picker"></div>
+              </div>
+              <img id="swImagePreview" class="img-preview" alt="preview" />
+              <div class="drop-hint" data-i18n="field.imageDropHint">或将图片拖放到这里</div>
             </div>
-            <input id="swImageUrl" placeholder="https://example.com/new-reference.png" spellcheck="false" data-pane="sw-url" style="display: none" />
-            <div data-pane="sw-file" style="display: none">
-              <input id="swImageFile" type="file" accept="image/*" />
-            </div>
-            <div data-pane="sw-sample" style="display: none">
-              <div id="swSamplePicker" class="sample-picker"></div>
-            </div>
-            <img id="swImagePreview" class="img-preview" alt="preview" />
 
             <label for="swEditingType" data-i18n="field.switchEditingType">新编辑场景</label>
             <select id="swEditingType">
@@ -942,7 +970,10 @@
 
       const minSessionDurationSeconds = 5;
       const maxSessionDurationSeconds = 30;
-      const recordingInputDelayMs = 1_050;
+      const recordingInputDelayMsByProvider = Object.freeze({
+        vidu: 1_050,
+        xmax: 500,
+      });
       const falClientCdnUrl = "https://cdn.jsdelivr.net/npm/@fal-ai/client@1.10.1/+esm";
       const xmaxClientCdnUrl = "https://cdn.jsdelivr.net/npm/@xmaxai/sdk-global@1.1.13/+esm";
       const decartEndpoint = "decart/lucy-2-5/realtime";
@@ -951,13 +982,17 @@
       const languageStorageKey = "streamQuickStartLanguage";
       const viduApiKeyStorageKey = "viduS2ApiKey";
       const falApiKeyStorageKey = "falApiKey";
-      const defaultSamplePath = "sample-characters/somake-anime.jpg";
+      const xmaxApiKeyStorageKey = "xmaxApiKey";
+      const defaultSamplePath = "sample-characters/retro-comic.jpg";
       const sampleCharacters = [
         { label: "Pixar Woman", path: "sample-characters/233708121-a-female-character-in-a-pixar-style-design-is-featured-in-this-full-body-shot-set-against-a-white.jpg" },
         { label: "Relaxed Woman", path: "sample-characters/animated-woman-character-leaning-against-wall-relaxed-white-backdrop_1260728-14983.avif" },
         { label: "Black Pixar", path: "sample-characters/black-pixar.png" },
         { label: "Flat Illustration", path: "sample-characters/flat-illustration.webp" },
         { label: "Ghibli", path: "sample-characters/ghibli.webp" },
+        { label: "Jamaican Bam Bam", path: "sample-characters/Jamaican-Bam-Bam.jpg" },
+        { label: "Retro Comic", path: "sample-characters/retro-comic.jpg" },
+        { label: "Smiling Retro Dancer", path: "sample-characters/smiling-retro-dancer.jpg" },
         { label: "Cinematic Woman", path: "sample-characters/lucid-origin_high_quality_3D_animated_cinematic_scene_Pixar_DreamWorks_inspired_style_female_-0.jpg" },
         { label: "Pixar Glasses", path: "sample-characters/pixar-glasses.webp" },
         { label: "Pixar Woman 2", path: "sample-characters/pixar-style-d-female-character-white-isolated-background-pixar-style-d-female-character-depicted-photo-showcasing-310427940.webp" },
@@ -981,8 +1016,8 @@
           "field.viduApiKey": "Vidu API Key（vda_...）",
           "field.falApiKey": "fal.ai API Key",
           "field.xmaxApiKey": "Xmax API Key（uk-...）",
-          "field.xmaxApiKeyHint": "永久密钥仅用于通过 Worker 创建短期、限额密钥，不会保存在浏览器中。",
           "field.referenceImage": "参考图（编辑用，必填）",
+          "field.imageDropHint": "或将图片拖放到这里",
           "field.editingType": "编辑效果",
           "field.videoSource": "视频输入",
           "field.videoFileHint": "连接后视频会自动循环播放并作为编辑输入；不会使用摄像头或麦克风。",
@@ -991,7 +1026,7 @@
           "field.syncComparisonRecording": "同步保存的视频",
           "field.syncComparisonRecordingHint": "将保存视频中的输入延迟约 1.05 秒。",
           "field.decartSyncComparisonRecordingHint": "Decart 使用低延迟 WebRTC，不应用 Vidu 的输入延迟。",
-          "field.xmaxSyncComparisonRecordingHint": "Xmax 使用自己的 WebRTC 延迟，不应用 Vidu 的固定输入延迟。",
+          "field.xmaxSyncComparisonRecordingHint": "将保存视频中的 Xmax 输入延迟约 0.5 秒。",
           "field.maxDuration": "最长时长",
           "videoSource.camera": "摄像头 + 麦克风",
           "videoSource.file": "上传的视频",
@@ -1047,6 +1082,7 @@
           "device.microphone": "麦克风",
           "error.apiKeyRequired": "请先填写 API Key",
           "error.imageRequired": "请先提供参考图（URL 或本地选图）",
+          "error.imageType": "请拖放有效的图片文件",
           "error.imageTooLarge": "本地图片过大（超过 4MB），请换一张或改用图片 URL",
           "error.sampleImageFailed": "无法加载所选的示例角色图片",
           "error.actionHttpFailed": "{action} failed: HTTP {status} {text}",
@@ -1126,8 +1162,8 @@
           "field.viduApiKey": "Vidu API Key (vda_...)",
           "field.falApiKey": "fal.ai API Key",
           "field.xmaxApiKey": "Xmax API Key (uk-...)",
-          "field.xmaxApiKeyHint": "The permanent key is only exchanged by the Worker for a short-lived, credit-limited key and is not saved in the browser.",
           "field.referenceImage": "Reference image (required)",
+          "field.imageDropHint": "or drop an image here",
           "field.editingType": "Effect",
           "field.videoSource": "Video input",
           "field.videoFileHint": "The video loops automatically and becomes the editing input after connecting; the camera and microphone are not used.",
@@ -1136,7 +1172,7 @@
           "field.syncComparisonRecording": "Sync saved comparison",
           "field.syncComparisonRecordingHint": "Delays its input by about 1.05 seconds.",
           "field.decartSyncComparisonRecordingHint": "Decart uses low-latency WebRTC; the Vidu input delay is not applied.",
-          "field.xmaxSyncComparisonRecordingHint": "Xmax uses its own WebRTC latency; the fixed Vidu input delay is not applied.",
+          "field.xmaxSyncComparisonRecordingHint": "Delays the saved Xmax input by about 0.5 seconds.",
           "field.maxDuration": "Max duration",
           "videoSource.camera": "Camera + microphone",
           "videoSource.file": "Uploaded video",
@@ -1192,6 +1228,7 @@
           "device.microphone": "Microphone",
           "error.apiKeyRequired": "Please enter the API Key first",
           "error.imageRequired": "Please provide a reference image (URL or local file)",
+          "error.imageType": "Please drop a valid image file",
           "error.imageTooLarge": "Local image is too large (over 4MB); use a smaller one or an image URL",
           "error.sampleImageFailed": "The selected sample character image could not be loaded",
           "error.actionHttpFailed": "{action} failed: HTTP {status} {text}",
@@ -1411,7 +1448,7 @@
 
       function selectedApiKeyStorageKey() {
         if (selectedProvider() === "decart") return falApiKeyStorageKey;
-        if (selectedProvider() === "xmax") return undefined;
+        if (selectedProvider() === "xmax") return xmaxApiKeyStorageKey;
         return viduApiKeyStorageKey;
       }
 
@@ -1423,8 +1460,8 @@
           isDecart ? "field.falApiKey" : isXmax ? "field.xmaxApiKey" : "field.viduApiKey",
         );
         $("#authToken").placeholder = isDecart ? "fal key" : isXmax ? "uk-..." : "vda_...";
-        $("#apiKeyHint").textContent = t(isXmax ? "field.xmaxApiKeyHint" : "field.apiKeyHint");
-        $("#syncComparisonRecording").disabled = isDecart || isXmax;
+        $("#apiKeyHint").textContent = t("field.apiKeyHint");
+        $("#syncComparisonRecording").disabled = isDecart;
         $("#syncComparisonRecordingHint").textContent = t(
           isDecart
             ? "field.decartSyncComparisonRecordingHint"
@@ -1550,6 +1587,60 @@
       }
 
       const IMAGE_SIZE_LIMIT = 4 * 1024 * 1024;
+
+      async function loadReferenceImageFile(file, groupPrefix) {
+        const isSwitch = groupPrefix === "sw";
+        const dataKey = isSwitch ? "switchImageDataURI" : "createImageDataURI";
+        if (!file.type.startsWith("image/")) {
+          state[dataKey] = "";
+          showNotice(t("error.imageType"));
+          return;
+        }
+
+        const filePane = isSwitch ? "sw-file" : "file";
+        document.querySelector(`${groupTabSelector(groupPrefix)}[data-itab="${filePane}"]`)?.click();
+        clearMediaNotice();
+        try {
+          const dataURI = await readFileAsDataURL(file, IMAGE_SIZE_LIMIT);
+          state[dataKey] = dataURI;
+          const preview = $(`#${isSwitch ? "swImagePreview" : "imagePreview"}`);
+          preview.src = dataURI;
+          preview.style.display = "block";
+          log(t("log.imageLoaded"), { name: file.name, size: file.size, type: file.type });
+        } catch (_error) {
+          state[dataKey] = "";
+          showNotice(t(isSwitch ? "error.switchImageTooLarge" : "error.imageTooLarge"));
+        }
+      }
+
+      function bindReferenceImageDropZone(groupPrefix) {
+        const isSwitch = groupPrefix === "sw";
+        const dropzone = $(`#${isSwitch ? "switchReferenceImageDropzone" : "referenceImageDropzone"}`);
+        let dragDepth = 0;
+
+        dropzone.addEventListener("dragenter", (event) => {
+          if (!event.dataTransfer?.types.includes("Files")) return;
+          event.preventDefault();
+          dragDepth += 1;
+          dropzone.classList.add("drag-active");
+        });
+        dropzone.addEventListener("dragover", (event) => {
+          if (!event.dataTransfer?.types.includes("Files")) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        });
+        dropzone.addEventListener("dragleave", () => {
+          dragDepth = Math.max(0, dragDepth - 1);
+          if (dragDepth === 0) dropzone.classList.remove("drag-active");
+        });
+        dropzone.addEventListener("drop", (event) => {
+          event.preventDefault();
+          dragDepth = 0;
+          dropzone.classList.remove("drag-active");
+          const file = event.dataTransfer?.files?.[0];
+          if (file) void loadReferenceImageFile(file, groupPrefix);
+        });
+      }
 
       async function loadSampleImage(path) {
         const response = await fetch(path);
@@ -2043,40 +2134,14 @@
         }
       });
 
-      $("#imageFile").addEventListener("change", async () => {
+      $("#imageFile").addEventListener("change", () => {
         const file = $("#imageFile").files?.[0];
-        if (!file) {
-          return;
-        }
-        try {
-          const dataURI = await readFileAsDataURL(file, IMAGE_SIZE_LIMIT);
-          state.createImageDataURI = dataURI;
-          const preview = $("#imagePreview");
-          preview.src = dataURI;
-          preview.style.display = "block";
-          log(t("log.imageLoaded"), { name: file.name, size: file.size, type: file.type });
-        } catch (_error) {
-          state.createImageDataURI = "";
-          showNotice(t("error.imageTooLarge"));
-        }
+        if (file) void loadReferenceImageFile(file, "");
       });
 
-      $("#swImageFile").addEventListener("change", async () => {
+      $("#swImageFile").addEventListener("change", () => {
         const file = $("#swImageFile").files?.[0];
-        if (!file) {
-          return;
-        }
-        try {
-          const dataURI = await readFileAsDataURL(file, IMAGE_SIZE_LIMIT);
-          state.switchImageDataURI = dataURI;
-          const preview = $("#swImagePreview");
-          preview.src = dataURI;
-          preview.style.display = "block";
-          log(t("log.imageLoaded"), { name: file.name, size: file.size, type: file.type });
-        } catch (_error) {
-          state.switchImageDataURI = "";
-          showNotice(t("error.switchImageTooLarge"));
-        }
+        if (file) void loadReferenceImageFile(file, "sw");
       });
 
       /* ---------- 创建直播流 ---------- */
@@ -2421,6 +2486,7 @@
         setStatus("#wsStatus", "status.wsConnecting", "warn");
         setStatus("#rtcStatus", "status.rtcJoining", "warn");
         const inputStream = await prepareXmaxInputStream();
+        startInputDelayBuffer();
         const [{ createXmaxClient, models }, temporaryCredentials] = await Promise.all([
           loadXmaxClient(),
           createXmaxTemporaryKey(permanentApiKey),
@@ -2798,20 +2864,32 @@
         return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || "";
       }
 
-      function drawVideoContained(context, video, x, y, width, height) {
-        if (!video.videoWidth || !video.videoHeight || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-          return;
-        }
-        const scale = Math.min(width / video.videoWidth, height / video.videoHeight);
-        const drawWidth = video.videoWidth * scale;
-        const drawHeight = video.videoHeight * scale;
-        context.drawImage(
-          video,
-          x + (width - drawWidth) / 2,
-          y + (height - drawHeight) / 2,
-          drawWidth,
-          drawHeight,
-        );
+      const comparisonRecordingHeight = 360;
+
+      function recordingPanelWidth(video, height = comparisonRecordingHeight) {
+        const aspectRatio = video.videoWidth && video.videoHeight
+          ? video.videoWidth / video.videoHeight
+          : 16 / 9;
+        // H.264 encoders commonly require even dimensions. Rounding each panel
+        // independently preserves its aspect ratio without introducing padding.
+        return Math.max(2, Math.round((height * aspectRatio) / 2) * 2);
+      }
+
+      function createComparisonRecordingLayout(remoteVideo) {
+        const height = comparisonRecordingHeight;
+        const inputWidth = recordingPanelWidth(localPreviewer, height);
+        const outputWidth = recordingPanelWidth(remoteVideo, height);
+        return {
+          height,
+          inputWidth,
+          outputWidth,
+          width: inputWidth + outputWidth,
+        };
+      }
+
+      function drawVideoToPanel(context, video, x, width, height) {
+        if (!video.videoWidth || !video.videoHeight || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+        context.drawImage(video, x, 0, width, height);
       }
 
       function stopInputDelayBuffer() {
@@ -2825,17 +2903,19 @@
 
       function startInputDelayBuffer() {
         stopInputDelayBuffer();
-        if (["decart", "xmax"].includes(state.activeProvider) || !$("#syncComparisonRecording").checked) return;
+        const inputDelayMs = recordingInputDelayMsByProvider[state.activeProvider] || 0;
+        if (!inputDelayMs || !$("#syncComparisonRecording").checked) return;
 
         const frameRate = 30;
         const frameIntervalMs = 1000 / frameRate;
         const buffer = {
-          width: 640,
-          height: 360,
+          delayMs: inputDelayMs,
+          width: recordingPanelWidth(localPreviewer),
+          height: comparisonRecordingHeight,
           frames: [],
           pool: [],
           timer: undefined,
-          maxFrames: Math.ceil(recordingInputDelayMs / frameIntervalMs) + 4,
+          maxFrames: Math.ceil(inputDelayMs / frameIntervalMs) + 4,
         };
         state.inputDelayBuffer = buffer;
 
@@ -2849,9 +2929,7 @@
               canvas.height = buffer.height;
             }
             const context = canvas.getContext("2d", { alpha: false });
-            context.fillStyle = "#0b0f16";
-            context.fillRect(0, 0, buffer.width, buffer.height);
-            drawVideoContained(context, localPreviewer, 0, 0, buffer.width, buffer.height);
+            context.drawImage(localPreviewer, 0, 0, buffer.width, buffer.height);
             buffer.frames.push({ canvas, capturedAt: performance.now() });
             while (buffer.frames.length > buffer.maxFrames) {
               buffer.pool.push(buffer.frames.shift().canvas);
@@ -2863,38 +2941,37 @@
       }
 
       function delayedInputFrame(now = performance.now()) {
-        const frames = state.inputDelayBuffer?.frames;
+        const buffer = state.inputDelayBuffer;
+        const frames = buffer?.frames;
         if (!frames?.length) return undefined;
-        const targetTime = now - recordingInputDelayMs;
+        const targetTime = now - buffer.delayMs;
         for (let index = frames.length - 1; index >= 0; index -= 1) {
           if (frames[index].capturedAt <= targetTime) return frames[index].canvas;
         }
         return frames[0].canvas;
       }
 
-      function drawComparisonFrame(context, remoteVideo) {
-        const width = comparisonRecordingCanvas.width;
-        const height = comparisonRecordingCanvas.height;
-        const panelWidth = width / 2;
+      function drawComparisonFrame(context, remoteVideo, layout) {
+        const { width, height, inputWidth, outputWidth } = layout;
         context.fillStyle = "#0b0f16";
         context.fillRect(0, 0, width, height);
         const bufferedInput = delayedInputFrame();
         if (bufferedInput) {
-          context.drawImage(bufferedInput, 0, 0, panelWidth, height);
+          context.drawImage(bufferedInput, 0, 0, inputWidth, height);
         } else {
-          drawVideoContained(context, localPreviewer, 0, 0, panelWidth, height);
+          drawVideoToPanel(context, localPreviewer, 0, inputWidth, height);
         }
-        drawVideoContained(context, remoteVideo, panelWidth, 0, panelWidth, height);
+        drawVideoToPanel(context, remoteVideo, inputWidth, outputWidth, height);
         context.fillStyle = "rgba(11, 15, 22, 0.72)";
-        context.fillRect(0, 0, panelWidth, 34);
-        context.fillRect(panelWidth, 0, panelWidth, 34);
+        context.fillRect(0, 0, inputWidth, 34);
+        context.fillRect(inputWidth, 0, outputWidth, 34);
         context.fillStyle = "#ffffff";
         context.font = "600 16px IBM Plex Mono, monospace";
         context.textBaseline = "middle";
         context.fillText(t("recording.input"), 14, 17);
-        context.fillText(t("recording.output"), panelWidth + 14, 17);
+        context.fillText(t("recording.output"), inputWidth + 14, 17);
         context.fillStyle = "rgba(255, 255, 255, 0.35)";
-        context.fillRect(panelWidth - 1, 0, 2, height);
+        context.fillRect(inputWidth - 1, 0, 2, height);
       }
 
       const mediaBunnyCdnUrl = "https://cdn.jsdelivr.net/npm/mediabunny@1.55.4/+esm";
@@ -2933,10 +3010,10 @@
         } = await loadMediaBunny();
         if (session.stopRequested) return;
 
-        comparisonRecordingCanvas.width = 1280;
-        comparisonRecordingCanvas.height = 360;
+        comparisonRecordingCanvas.width = session.layout.width;
+        comparisonRecordingCanvas.height = session.layout.height;
         session.context = comparisonRecordingCanvas.getContext("2d", { alpha: false });
-        drawComparisonFrame(session.context, video);
+        drawComparisonFrame(session.context, video, session.layout);
 
         session.target = new BufferTarget();
         session.output = new Output({
@@ -2970,7 +3047,7 @@
         const encodeFrame = async () => {
           if (!session.active) return;
           const startedAt = performance.now();
-          drawComparisonFrame(session.context, video);
+          drawComparisonFrame(session.context, video, session.layout);
           const timestamp = session.frameIndex / session.frameRate;
           session.frameEncodingPromise = session.videoSource.add(timestamp, 1 / session.frameRate);
           await session.frameEncodingPromise;
@@ -2989,10 +3066,10 @@
         if (typeof window.MediaRecorder !== "function" || typeof comparisonRecordingCanvas.captureStream !== "function") {
           throw new Error(t("error.comparisonRecordingUnsupported"));
         }
-        comparisonRecordingCanvas.width = 1280;
-        comparisonRecordingCanvas.height = 360;
+        comparisonRecordingCanvas.width = session.layout.width;
+        comparisonRecordingCanvas.height = session.layout.height;
         const context = comparisonRecordingCanvas.getContext("2d", { alpha: false });
-        drawComparisonFrame(context, video);
+        drawComparisonFrame(context, video, session.layout);
         session.stream = comparisonRecordingCanvas.captureStream(session.frameRate);
         video.srcObject.getAudioTracks().forEach((track) => session.stream.addTrack(track.clone()));
         const mimeType = preferredRecordingMimeType();
@@ -3004,7 +3081,7 @@
         session.chunks = [];
         session.mimeType = session.recorder.mimeType || mimeType;
         const drawFrame = () => {
-          drawComparisonFrame(context, video);
+          drawComparisonFrame(context, video, session.layout);
           session.frameRequest = window.requestAnimationFrame(drawFrame);
         };
         drawFrame();
@@ -3043,7 +3120,14 @@
       }
 
       function tryStartRemoteRecording(video) {
-        if (state.remoteRecording || !(video.srcObject instanceof MediaStream)) return;
+        if (
+          state.remoteRecording
+          || !(video.srcObject instanceof MediaStream)
+          || !video.videoWidth
+          || !video.videoHeight
+          || !localPreviewer.videoWidth
+          || !localPreviewer.videoHeight
+        ) return;
         const session = {
           kind: "starting",
           frameRate: 30,
@@ -3052,6 +3136,7 @@
           frameEncodingPromise: undefined,
           stopRequested: false,
           active: false,
+          layout: createComparisonRecordingLayout(video),
         };
         state.remoteRecording = session;
         session.readyPromise = initializeRemoteRecording(session, video).catch((error) => {
@@ -3173,7 +3258,7 @@
         $("#videoFile").disabled = disabled;
         $("#enableSegmentation").disabled = disabled;
         $("#segmentationBackgroundColor").disabled = !isSegmentationEnabled();
-        $("#syncComparisonRecording").disabled = disabled || ["decart", "xmax"].includes(selectedProvider());
+        $("#syncComparisonRecording").disabled = disabled || selectedProvider() === "decart";
         document.querySelectorAll('input[name="editingType"]').forEach((input) => {
           input.disabled = disabled;
         });
@@ -3369,6 +3454,8 @@
       /* ---------- 启动 ---------- */
       bindImageTabs("");
       bindImageTabs("sw");
+      bindReferenceImageDropZone("");
+      bindReferenceImageDropZone("sw");
       bindSamplePicker("");
       bindSamplePicker("sw");
       selectDefaultSample();

@@ -38,10 +38,10 @@ Cloudflare serves everything in `public/` and runs `worker/index.js` first for A
 ## Security
 
 - Local environment files, Wrangler state, and dependencies are ignored by Git.
-- Vidu and fal.ai keys are persisted separately in the current browser's local storage and can be removed by clearing the API-key field.
+- Vidu, fal.ai, and Xmax keys are persisted separately in the current browser's local storage and can be removed by clearing the API-key field.
 - The Worker does not log, persist, or bundle Vidu API keys; it only forwards a supplied key during session creation.
 - The subsequent browser WebSocket proxy uses Vidu's short-lived `client_secret`, not the API key.
-- Xmax permanent keys are not saved in browser storage. The Worker uses them only to issue a bounded temporary key and returns only that temporary credential to the browser.
+- The Worker uses an Xmax permanent key only to issue a bounded temporary key and returns only that temporary credential to the browser.
 - Never add a real API key to source code, screenshots, issues, or commits.
 - If a key is ever committed, revoke it immediately and remove it from Git history.
 
