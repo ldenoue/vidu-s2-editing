@@ -1,6 +1,6 @@
 # Realtime Video Editing Demo
 
-A Cloudflare Worker-hosted browser demo for Vidu S2, Decart Lucy 2.5, and Xmax X2.0 live video editing. It can send a webcam or uploaded video, preview optional WebGPU selfie segmentation, select bundled character images, and save a side-by-side MP4 of the sent input and received output.
+A Cloudflare Worker-hosted browser demo for Vidu S2, Decart Lucy 2.5, and Xmax X2.0 live video editing. It can send a webcam or uploaded video, preview optional WebGPU selfie segmentation, select bundled character images, and save an MP4 containing the input, reference image, and generated output with its Style or Character mode.
 
 ## Architecture
 

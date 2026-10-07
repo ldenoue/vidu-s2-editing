@@ -993,6 +993,7 @@
         { label: "Jamaican Bam Bam", path: "sample-characters/Jamaican-Bam-Bam.jpg" },
         { label: "Retro Comic", path: "sample-characters/retro-comic.jpg" },
         { label: "Smiling Retro Dancer", path: "sample-characters/smiling-retro-dancer.jpg" },
+        { label: "Woman Flames", path: "sample-characters/woman-flames-green-screen.jpg" },
         { label: "Cinematic Woman", path: "sample-characters/lucid-origin_high_quality_3D_animated_cinematic_scene_Pixar_DreamWorks_inspired_style_female_-0.jpg" },
         { label: "Pixar Glasses", path: "sample-characters/pixar-glasses.webp" },
         { label: "Pixar Woman 2", path: "sample-characters/pixar-style-d-female-character-white-isolated-background-pixar-style-d-female-character-depicted-photo-showcasing-310427940.webp" },
@@ -1005,7 +1006,7 @@
       const translations = {
         zh: {
           "page.title": "实时编辑直播流 Demo",
-          "page.hint": "选择 Vidu、Decart 或 Xmax，将摄像头或循环视频实时转换并保存输入 / 输出对比。Cloudflare Worker 会代理需要服务端凭证的步骤；浏览器只在实时连接中使用短期凭证。",
+          "page.hint": "选择 Vidu、Decart 或 Xmax，将摄像头或循环视频实时转换并保存输入 / 参考图 / 输出对比。Cloudflare Worker 会代理需要服务端凭证的步骤；浏览器只在实时连接中使用短期凭证。",
           "language.label": "语言",
           "environment.cn": "国内",
           "environment.ovs": "海外",
@@ -1106,7 +1107,7 @@
           "error.segmentationFailed": "背景分割启动失败",
           "error.recordingUnsupported": "当前浏览器不支持录制远端视频。",
           "error.recordingFailed": "远端视频录制失败",
-          "error.comparisonRecordingUnsupported": "当前浏览器不支持录制输入 / 输出对比画面。",
+          "error.comparisonRecordingUnsupported": "当前浏览器不支持录制输入 / 参考图 / 输出对比画面。",
           "error.mediaPermission": "{device}未授权：请点击浏览器地址栏左侧的权限图标，允许当前页面使用{device}后重试。",
           "error.mediaNotFound": "未检测到可用{device}：请确认设备已连接，并且系统设置中可以被浏览器访问。",
           "error.mediaBusy": "{device}无法启动：可能被其他应用占用，请关闭占用{device}的软件后重试。",
@@ -1142,16 +1143,20 @@
           "log.sessionTimerStarted": "收到首个远端视频帧，{durationSeconds} 秒会话计时开始",
           "log.segmentationReady": "MediaPipe 背景分割已启用",
           "log.segmentationStopped": "MediaPipe 背景分割已停止",
-          "log.recordingStarted": "开始录制输入 / 输出对比画面",
+          "log.recordingStarted": "开始录制输入 / 参考图 / 输出对比画面",
           "log.recordingStopped": "远端结果录制已停止",
           "log.recordingSaved": "远端结果录像已保存",
           "log.recordingEmpty": "远端结果录像没有可保存的数据",
           "recording.input": "输入",
+          "recording.reference": "参考图",
+          "recording.referenceUnavailable": "参考图无法嵌入",
           "recording.output": "输出",
+          "recording.style": "风格迁移",
+          "recording.character": "角色替换",
         },
         en: {
           "page.title": "Live Editing Stream Demo",
-          "page.hint": "Choose Vidu, Decart, or Xmax to transform a camera or looping video in real time and save an input/output comparison. The Cloudflare Worker proxies steps that require server credentials; the browser uses only short-lived credentials for realtime connections.",
+          "page.hint": "Choose Vidu, Decart, or Xmax to transform a camera or looping video in real time and save an input/reference/output comparison. The Cloudflare Worker proxies steps that require server credentials; the browser uses only short-lived credentials for realtime connections.",
           "language.label": "Language",
           "environment.cn": "China",
           "environment.ovs": "Global",
@@ -1252,7 +1257,7 @@
           "error.segmentationFailed": "Background segmentation failed to start",
           "error.recordingUnsupported": "This browser does not support recording the remote video.",
           "error.recordingFailed": "Remote video recording failed",
-          "error.comparisonRecordingUnsupported": "This browser cannot record the input/output comparison canvas.",
+          "error.comparisonRecordingUnsupported": "This browser cannot record the input/reference/output comparison canvas.",
           "error.mediaPermission": "{device} permission denied: click the permission icon on the left of the address bar, allow this page to use the {device}, then retry.",
           "error.mediaNotFound": "No usable {device} detected: make sure it is connected and accessible to the browser in system settings.",
           "error.mediaBusy": "{device} cannot start: it may be occupied by another app; close that app and retry.",
@@ -1288,12 +1293,16 @@
           "log.sessionTimerStarted": "First remote video frame received; {durationSeconds}-second session timer started",
           "log.segmentationReady": "MediaPipe background segmentation enabled",
           "log.segmentationStopped": "MediaPipe background segmentation stopped",
-          "log.recordingStarted": "Started recording the input/output comparison",
+          "log.recordingStarted": "Started recording the input/reference/output comparison",
           "log.recordingStopped": "Remote result recording stopped",
           "log.recordingSaved": "Remote result recording saved",
           "log.recordingEmpty": "The remote result recording contained no data to save",
           "recording.input": "INPUT",
+          "recording.reference": "REFERENCE",
+          "recording.referenceUnavailable": "REFERENCE UNAVAILABLE",
           "recording.output": "OUTPUT",
+          "recording.style": "STYLE TRANSFER",
+          "recording.character": "CHARACTER TRANSFER",
         },
       };
 
@@ -2875,21 +2884,78 @@
         return Math.max(2, Math.round((height * aspectRatio) / 2) * 2);
       }
 
-      function createComparisonRecordingLayout(remoteVideo) {
+      function createComparisonRecordingLayout(remoteVideo, referenceImage) {
         const height = comparisonRecordingHeight;
         const inputWidth = recordingPanelWidth(localPreviewer, height);
+        const referenceAspectRatio = referenceImage?.naturalWidth && referenceImage?.naturalHeight
+          ? referenceImage.naturalWidth / referenceImage.naturalHeight
+          : 1;
+        const referenceWidth = Math.max(
+          Math.round(height * 0.6 / 2) * 2,
+          Math.min(Math.round(height * 1.5 / 2) * 2, Math.round(height * referenceAspectRatio / 2) * 2),
+        );
         const outputWidth = recordingPanelWidth(remoteVideo, height);
         return {
           height,
           inputWidth,
+          referenceWidth,
           outputWidth,
-          width: inputWidth + outputWidth,
+          width: inputWidth + referenceWidth + outputWidth,
         };
       }
 
       function drawVideoToPanel(context, video, x, width, height) {
         if (!video.videoWidth || !video.videoHeight || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
         context.drawImage(video, x, 0, width, height);
+      }
+
+      function drawImageContained(context, image, x, width, height) {
+        if (!image?.naturalWidth || !image?.naturalHeight) return;
+        const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+        const drawWidth = image.naturalWidth * scale;
+        const drawHeight = image.naturalHeight * scale;
+        context.drawImage(
+          image,
+          x + (width - drawWidth) / 2,
+          (height - drawHeight) / 2,
+          drawWidth,
+          drawHeight,
+        );
+      }
+
+      function loadRecordingReferenceImage(source) {
+        if (!source) return Promise.resolve(undefined);
+        return new Promise((resolve) => {
+          const image = new Image();
+          let settled = false;
+          const finish = (result) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            resolve(result);
+          };
+          const timeout = window.setTimeout(() => {
+            log("Reference image timed out while preparing the recording");
+            finish(undefined);
+          }, 5_000);
+          if (/^https?:\/\//i.test(source)) image.crossOrigin = "anonymous";
+          image.onload = () => finish(image);
+          image.onerror = () => {
+            log("Reference image could not be embedded in the recording", {
+              sourceType: source.startsWith("data:") ? "data URI" : "remote URL",
+            });
+            finish(undefined);
+          };
+          image.src = source;
+        });
+      }
+
+      function recordingEffectSlug() {
+        return selectedEditingType() === "subject_replacement" ? "char" : "style";
+      }
+
+      function recordingEffectLabel(effectSlug) {
+        return t(effectSlug === "char" ? "recording.character" : "recording.style");
       }
 
       function stopInputDelayBuffer() {
@@ -2951,8 +3017,11 @@
         return frames[0].canvas;
       }
 
-      function drawComparisonFrame(context, remoteVideo, layout) {
-        const { width, height, inputWidth, outputWidth } = layout;
+      function drawComparisonFrame(context, remoteVideo, session) {
+        const { layout } = session;
+        const { width, height, inputWidth, referenceWidth, outputWidth } = layout;
+        const referenceX = inputWidth;
+        const outputX = inputWidth + referenceWidth;
         context.fillStyle = "#0b0f16";
         context.fillRect(0, 0, width, height);
         const bufferedInput = delayedInputFrame();
@@ -2961,17 +3030,31 @@
         } else {
           drawVideoToPanel(context, localPreviewer, 0, inputWidth, height);
         }
-        drawVideoToPanel(context, remoteVideo, inputWidth, outputWidth, height);
+        drawImageContained(context, session.referenceImage, referenceX, referenceWidth, height);
+        if (!session.referenceImage) {
+          context.fillStyle = "rgba(255, 255, 255, 0.55)";
+          context.font = "600 12px IBM Plex Mono, monospace";
+          context.textAlign = "center";
+          context.fillText(t("recording.referenceUnavailable"), referenceX + referenceWidth / 2, height / 2);
+          context.textAlign = "start";
+        }
+        drawVideoToPanel(context, remoteVideo, outputX, outputWidth, height);
         context.fillStyle = "rgba(11, 15, 22, 0.72)";
         context.fillRect(0, 0, inputWidth, 34);
-        context.fillRect(inputWidth, 0, outputWidth, 34);
+        context.fillRect(referenceX, 0, referenceWidth, 34);
+        context.fillRect(outputX, 0, outputWidth, 34);
+        context.fillRect(referenceX, height - 30, referenceWidth, 30);
         context.fillStyle = "#ffffff";
         context.font = "600 16px IBM Plex Mono, monospace";
         context.textBaseline = "middle";
         context.fillText(t("recording.input"), 14, 17);
-        context.fillText(t("recording.output"), inputWidth + 14, 17);
+        context.fillText(t("recording.reference"), referenceX + 14, 17);
+        context.fillText(t("recording.output"), outputX + 14, 17);
+        context.font = "600 13px IBM Plex Mono, monospace";
+        context.fillText(recordingEffectLabel(session.effectSlug), referenceX + 14, height - 15);
         context.fillStyle = "rgba(255, 255, 255, 0.35)";
         context.fillRect(inputWidth - 1, 0, 2, height);
+        context.fillRect(outputX - 1, 0, 2, height);
       }
 
       const mediaBunnyCdnUrl = "https://cdn.jsdelivr.net/npm/mediabunny@1.55.4/+esm";
@@ -3013,7 +3096,7 @@
         comparisonRecordingCanvas.width = session.layout.width;
         comparisonRecordingCanvas.height = session.layout.height;
         session.context = comparisonRecordingCanvas.getContext("2d", { alpha: false });
-        drawComparisonFrame(session.context, video, session.layout);
+        drawComparisonFrame(session.context, video, session);
 
         session.target = new BufferTarget();
         session.output = new Output({
@@ -3047,7 +3130,7 @@
         const encodeFrame = async () => {
           if (!session.active) return;
           const startedAt = performance.now();
-          drawComparisonFrame(session.context, video, session.layout);
+          drawComparisonFrame(session.context, video, session);
           const timestamp = session.frameIndex / session.frameRate;
           session.frameEncodingPromise = session.videoSource.add(timestamp, 1 / session.frameRate);
           await session.frameEncodingPromise;
@@ -3069,7 +3152,7 @@
         comparisonRecordingCanvas.width = session.layout.width;
         comparisonRecordingCanvas.height = session.layout.height;
         const context = comparisonRecordingCanvas.getContext("2d", { alpha: false });
-        drawComparisonFrame(context, video, session.layout);
+        drawComparisonFrame(context, video, session);
         session.stream = comparisonRecordingCanvas.captureStream(session.frameRate);
         video.srcObject.getAudioTracks().forEach((track) => session.stream.addTrack(track.clone()));
         const mimeType = preferredRecordingMimeType();
@@ -3081,7 +3164,7 @@
         session.chunks = [];
         session.mimeType = session.recorder.mimeType || mimeType;
         const drawFrame = () => {
-          drawComparisonFrame(context, video, session.layout);
+          drawComparisonFrame(context, video, session);
           session.frameRequest = window.requestAnimationFrame(drawFrame);
         };
         drawFrame();
@@ -3136,26 +3219,33 @@
           frameEncodingPromise: undefined,
           stopRequested: false,
           active: false,
-          layout: createComparisonRecordingLayout(video),
+          layout: undefined,
+          referenceImage: undefined,
+          referenceImageSource: activeImageValue(""),
+          effectSlug: recordingEffectSlug(),
         };
         state.remoteRecording = session;
-        session.readyPromise = initializeRemoteRecording(session, video).catch((error) => {
+        session.readyPromise = loadRecordingReferenceImage(session.referenceImageSource).then((referenceImage) => {
+          session.referenceImage = referenceImage;
+          session.layout = createComparisonRecordingLayout(video, referenceImage);
+          return initializeRemoteRecording(session, video);
+        }).catch((error) => {
           if (state.remoteRecording === session) state.remoteRecording = undefined;
           showNotice(`${t("error.recordingFailed")}: ${error.message || String(error)}`);
           log(t("error.recordingFailed"), errorToJson(error));
         });
       }
 
-      function recordingFilename(mimeType) {
+      function recordingFilename(mimeType, effectSlug = recordingEffectSlug()) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const liveId = String(state.live?.id || "session").replace(/[^a-zA-Z0-9_-]/g, "-");
         const extension = mimeType.includes("mp4") ? "mp4" : "webm";
         const provider = state.activeProvider || selectedProvider();
-        return `${provider}-input-output-${liveId}-${timestamp}.${extension}`;
+        return `${provider}-${effectSlug}-input-reference-output-${liveId}-${timestamp}.${extension}`;
       }
 
-      function downloadRecording(blob, mimeType) {
-        const filename = recordingFilename(mimeType);
+      function downloadRecording(blob, mimeType, effectSlug) {
+        const filename = recordingFilename(mimeType, effectSlug);
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -3195,7 +3285,7 @@
           }
           if (blob) {
             log(t("log.recordingStopped"), { bytes: blob.size, mimeType: session.mimeType, encoder: session.kind });
-            if (download && blob.size) downloadRecording(blob, session.mimeType);
+            if (download && blob.size) downloadRecording(blob, session.mimeType, session.effectSlug);
             else if (download) log(t("log.recordingEmpty"));
           }
         } catch (error) {
