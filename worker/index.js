@@ -4,6 +4,8 @@ const VIDU_ORIGINS = {
 };
 
 const XMAX_TEMPORARY_KEY_URL = "https://api.xmax.ai/open/api/v1/temporary-api-key";
+const REACTOR_TOKEN_URL = "https://api.reactor.inc/tokens";
+const REACTOR_X2_MODEL = "xmax/x2";
 
 const EDITING_TYPES = new Set([
   "style_transfer",
@@ -188,6 +190,72 @@ export async function createXmaxRealtimeKey(request) {
   return json({ temporaryApiKey, expireTimestamp });
 }
 
+export async function createReactorToken(request) {
+  const apiKey = apiKeyFrom(request);
+  if (!apiKey.startsWith("rk_")) {
+    return json({ message: "A valid Reactor API key is required" }, 401);
+  }
+
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ message: "Request body must be valid JSON" }, 400);
+  }
+  const requestedDuration = Math.round(Number(payload?.durationSeconds));
+  if (!Number.isFinite(requestedDuration) || requestedDuration < 5 || requestedDuration > 30) {
+    return json({ message: "durationSeconds must be between 5 and 30" }, 400);
+  }
+
+  let upstream;
+  try {
+    upstream = await fetch(REACTOR_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Reactor-API-Key": apiKey,
+      },
+      body: JSON.stringify({
+        expires_after: 300,
+        authorization_details: [{
+          type: "session",
+          resources: { models: { match: [REACTOR_X2_MODEL] } },
+          constraints: {
+            max_sessions: 1,
+            // Leave room for model startup before the browser's output timer starts.
+            max_session_duration_seconds: requestedDuration + 120,
+          },
+        }],
+      }),
+    });
+  } catch {
+    return json({ message: "Could not reach the Reactor API" }, 502);
+  }
+
+  const responseText = await upstream.text();
+  if (!upstream.ok) {
+    return new Response(responseText, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("Content-Type") || "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
+  let responsePayload;
+  try {
+    responsePayload = JSON.parse(responseText);
+  } catch {
+    return json({ message: "Reactor returned an invalid response" }, 502);
+  }
+  if (typeof responsePayload?.jwt !== "string" || !responsePayload.jwt) {
+    return json({ message: "Reactor did not return a session token" }, 502);
+  }
+
+  return json({ jwt: responsePayload.jwt, expires_at: responsePayload.expires_at });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -208,6 +276,13 @@ export default {
         return json({ message: "Method not allowed" }, 405);
       }
       return createXmaxRealtimeKey(request);
+    }
+
+    if (url.pathname === "/api/reactor/token") {
+      if (request.method !== "POST") {
+        return json({ message: "Method not allowed" }, 405);
+      }
+      return createReactorToken(request);
     }
 
     return env.ASSETS.fetch(request);

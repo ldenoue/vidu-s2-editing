@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { createViduSession, createXmaxRealtimeKey, proxyViduWebSocket } from "./index.js";
+import {
+  createReactorToken,
+  createViduSession,
+  createXmaxRealtimeKey,
+  proxyViduWebSocket,
+} from "./index.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -149,4 +154,48 @@ test("rejects malformed Xmax keys and excessive session durations", async () => 
     body: JSON.stringify({ durationSeconds: 300 }),
   }));
   assert.equal(badDurationResponse.status, 400);
+});
+
+test("exchanges a Reactor key for a tightly scoped X2 browser token", async () => {
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url: String(url), init };
+    return Response.json({ jwt: "short-lived-reactor-jwt", expires_at: 1791965011 });
+  };
+
+  const response = await createReactorToken(new Request("https://example.test/api/reactor/token", {
+    method: "POST",
+    headers: {
+      Authorization: "rk_user-test-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ durationSeconds: 30 }),
+  }));
+
+  assert.equal(response.status, 200);
+  assert.equal(captured.url, "https://api.reactor.inc/tokens");
+  assert.equal(captured.init.headers["Reactor-API-Key"], "rk_user-test-key");
+  assert.deepEqual(JSON.parse(captured.init.body), {
+    expires_after: 300,
+    authorization_details: [{
+      type: "session",
+      resources: { models: { match: ["xmax/x2"] } },
+      constraints: { max_sessions: 1, max_session_duration_seconds: 150 },
+    }],
+  });
+  assert.deepEqual(await response.json(), {
+    jwt: "short-lived-reactor-jwt",
+    expires_at: 1791965011,
+  });
+});
+
+test("requires a Reactor key and validates requested duration", async () => {
+  const request = (durationSeconds, authorization = "") => new Request("https://example.test/api/reactor/token", {
+    method: "POST",
+    headers: { Authorization: authorization, "Content-Type": "application/json" },
+    body: JSON.stringify({ durationSeconds }),
+  });
+
+  assert.equal((await createReactorToken(request(10))).status, 401);
+  assert.equal((await createReactorToken(request(31, "rk_user-test-key"))).status, 400);
 });

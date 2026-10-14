@@ -443,7 +443,7 @@
       }
 
       .provider-segments {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
       }
 
       .effect-segments label {
@@ -816,6 +816,10 @@
               <input type="radio" name="provider" value="xmax" checked />
               <span>Xmax</span>
             </label>
+            <label>
+              <input type="radio" name="provider" value="reactor" />
+              <span>Reactor/XMAX</span>
+            </label>
           </div>
 
           <label id="authTokenLabel" for="authToken">Vidu API Key（vda_...）</label>
@@ -973,9 +977,11 @@
       const recordingInputDelayMsByProvider = Object.freeze({
         vidu: 1_050,
         xmax: 500,
+        reactor: 500,
       });
       const falClientCdnUrl = "https://cdn.jsdelivr.net/npm/@fal-ai/client@1.10.1/+esm";
       const xmaxClientCdnUrl = "https://cdn.jsdelivr.net/npm/@xmaxai/sdk-global@1.1.13/+esm";
+      const reactorX2ClientCdnUrl = "https://cdn.jsdelivr.net/npm/@reactor-models/x2@1.0.0/core/+esm";
       const decartEndpoint = "decart/lucy-2-5/realtime";
 
       const fallbackLanguage = "zh";
@@ -983,6 +989,7 @@
       const viduApiKeyStorageKey = "viduS2ApiKey";
       const falApiKeyStorageKey = "falApiKey";
       const xmaxApiKeyStorageKey = "xmaxApiKey";
+      const reactorApiKeyStorageKey = "reactorApiKey";
       const defaultSamplePath = "sample-characters/retro-comic.jpg";
       const sampleCharacters = [
         { label: "Pixar Woman", path: "sample-characters/233708121-a-female-character-in-a-pixar-style-design-is-featured-in-this-full-body-shot-set-against-a-white.jpg" },
@@ -1006,7 +1013,7 @@
       const translations = {
         zh: {
           "page.title": "实时编辑直播流 Demo",
-          "page.hint": "选择 Vidu、Decart 或 Xmax，将摄像头或循环视频实时转换并保存无标签的输入 / 输出训练配对。Cloudflare Worker 会代理需要服务端凭证的步骤；浏览器只在实时连接中使用短期凭证。",
+          "page.hint": "选择 Vidu、Decart、Xmax 或 Reactor/XMAX，将摄像头或循环视频实时转换并保存无标签的输入 / 输出训练配对。Cloudflare Worker 会代理需要服务端凭证的步骤；浏览器只在实时连接中使用短期凭证。",
           "language.label": "语言",
           "environment.cn": "国内",
           "environment.ovs": "海外",
@@ -1017,6 +1024,7 @@
           "field.viduApiKey": "Vidu API Key（vda_...）",
           "field.falApiKey": "fal.ai API Key",
           "field.xmaxApiKey": "Xmax API Key（uk-...）",
+          "field.reactorApiKey": "Reactor API Key（rk_...）",
           "field.referenceImage": "参考图（编辑用，必填）",
           "field.imageDropHint": "或将图片拖放到这里",
           "field.editingType": "编辑效果",
@@ -1028,6 +1036,7 @@
           "field.syncComparisonRecordingHint": "将保存视频中的输入延迟约 1.05 秒。",
           "field.decartSyncComparisonRecordingHint": "Decart 使用低延迟 WebRTC，不应用 Vidu 的输入延迟。",
           "field.xmaxSyncComparisonRecordingHint": "将保存视频中的 Xmax 输入延迟约 0.5 秒。",
+          "field.reactorSyncComparisonRecordingHint": "将保存视频中的 Reactor/XMAX 输入延迟约 0.5 秒。",
           "field.maxDuration": "最长时长",
           "videoSource.camera": "摄像头 + 麦克风",
           "videoSource.file": "上传的视频",
@@ -1057,6 +1066,7 @@
           "video.renderStream": "实时编辑合成结果（render_uid）",
           "video.decartResult": "Decart 实时编辑结果",
           "video.xmaxResult": "Xmax 实时编辑结果",
+          "video.reactorResult": "Reactor/XMAX 实时编辑结果",
           "session.empty": "尚未创建直播流",
           "status.apiIdle": "API idle",
           "status.apiCreating": "API creating",
@@ -1150,7 +1160,7 @@
         },
         en: {
           "page.title": "Live Editing Stream Demo",
-          "page.hint": "Choose Vidu, Decart, or Xmax to transform a camera or looping video in real time and save an unlabeled source/output training pair. The Cloudflare Worker proxies steps that require server credentials; the browser uses only short-lived credentials for realtime connections.",
+          "page.hint": "Choose Vidu, Decart, Xmax, or Reactor/XMAX to transform a camera or looping video in real time and save an unlabeled source/output training pair. The Cloudflare Worker proxies steps that require server credentials; the browser uses only short-lived credentials for realtime connections.",
           "language.label": "Language",
           "environment.cn": "China",
           "environment.ovs": "Global",
@@ -1161,6 +1171,7 @@
           "field.viduApiKey": "Vidu API Key (vda_...)",
           "field.falApiKey": "fal.ai API Key",
           "field.xmaxApiKey": "Xmax API Key (uk-...)",
+          "field.reactorApiKey": "Reactor API Key (rk_...)",
           "field.referenceImage": "Reference image (required)",
           "field.imageDropHint": "or drop an image here",
           "field.editingType": "Effect",
@@ -1172,6 +1183,7 @@
           "field.syncComparisonRecordingHint": "Delays its input by about 1.05 seconds.",
           "field.decartSyncComparisonRecordingHint": "Decart uses low-latency WebRTC; the Vidu input delay is not applied.",
           "field.xmaxSyncComparisonRecordingHint": "Delays the saved Xmax input by about 0.5 seconds.",
+          "field.reactorSyncComparisonRecordingHint": "Delays the saved Reactor/XMAX input by about 0.5 seconds.",
           "field.maxDuration": "Max duration",
           "videoSource.camera": "Camera + microphone",
           "videoSource.file": "Uploaded video",
@@ -1201,6 +1213,7 @@
           "video.renderStream": "Live editing result (render_uid)",
           "video.decartResult": "Decart live editing result",
           "video.xmaxResult": "Xmax live editing result",
+          "video.reactorResult": "Reactor/XMAX live editing result",
           "session.empty": "No live stream created yet",
           "status.apiIdle": "API idle",
           "status.apiCreating": "API creating",
@@ -1354,6 +1367,9 @@
         xmaxModulePromise: undefined,
         xmaxSession: undefined,
         xmaxInputStream: undefined,
+        reactorModulePromise: undefined,
+        reactorSession: undefined,
+        reactorInputStream: undefined,
         remoteVideoElMap: new Map(),
         connInitRetryTimer: undefined,
         autoHangupTimer: undefined,
@@ -1446,6 +1462,7 @@
       function selectedApiKeyStorageKey() {
         if (selectedProvider() === "decart") return falApiKeyStorageKey;
         if (selectedProvider() === "xmax") return xmaxApiKeyStorageKey;
+        if (selectedProvider() === "reactor") return reactorApiKeyStorageKey;
         return viduApiKeyStorageKey;
       }
 
@@ -1453,10 +1470,23 @@
         const provider = selectedProvider();
         const isDecart = provider === "decart";
         const isXmax = provider === "xmax";
+        const isReactor = provider === "reactor";
         $("#authTokenLabel").textContent = t(
-          isDecart ? "field.falApiKey" : isXmax ? "field.xmaxApiKey" : "field.viduApiKey",
+          isDecart
+            ? "field.falApiKey"
+            : isXmax
+              ? "field.xmaxApiKey"
+              : isReactor
+                ? "field.reactorApiKey"
+                : "field.viduApiKey",
         );
-        $("#authToken").placeholder = isDecart ? "fal key" : isXmax ? "uk-..." : "vda_...";
+        $("#authToken").placeholder = isDecart
+          ? "fal key"
+          : isXmax
+            ? "uk-..."
+            : isReactor
+              ? "rk_..."
+              : "vda_...";
         $("#apiKeyHint").textContent = t("field.apiKeyHint");
         $("#syncComparisonRecording").disabled = isDecart;
         $("#syncComparisonRecordingHint").textContent = t(
@@ -1464,13 +1494,21 @@
             ? "field.decartSyncComparisonRecordingHint"
             : isXmax
               ? "field.xmaxSyncComparisonRecordingHint"
+              : isReactor
+                ? "field.reactorSyncComparisonRecordingHint"
               : "field.syncComparisonRecordingHint",
         );
         $("#remoteVideoTitle").textContent = t(
-          isDecart ? "video.decartResult" : isXmax ? "video.xmaxResult" : "video.renderStream",
+          isDecart
+            ? "video.decartResult"
+            : isXmax
+              ? "video.xmaxResult"
+              : isReactor
+                ? "video.reactorResult"
+                : "video.renderStream",
         );
-        $("#editingStyleLabel").textContent = t(isXmax ? "editing.vibex" : "editing.style");
-        $("#editingSubjectLabel").textContent = t(isXmax ? "editing.charx" : "editing.subject");
+        $("#editingStyleLabel").textContent = t(isXmax || isReactor ? "editing.vibex" : "editing.style");
+        $("#editingSubjectLabel").textContent = t(isXmax || isReactor ? "editing.charx" : "editing.subject");
       }
 
       function restoreApiKey() {
@@ -2273,6 +2311,10 @@
         return prepareExternalInputStream("xmaxInputStream");
       }
 
+      function prepareReactorInputStream() {
+        return prepareExternalInputStream("reactorInputStream");
+      }
+
       function attachDecartRemoteStream(stream) {
         const key = "camera_decart";
         let video = state.remoteVideoElMap.get(key);
@@ -2418,8 +2460,8 @@
         return state.xmaxModulePromise;
       }
 
-      function xmaxPrompt() {
-        return selectedEditingType() === "subject_replacement"
+      function xmaxPrompt(editingType = selectedEditingType()) {
+        return editingType === "subject_replacement"
           ? "视频中角色替换成参考图中角色"
           : "视频风格变为参考图指定的风格";
       }
@@ -2524,6 +2566,116 @@
         setStatus("#apiStatus", "status.apiLive", "ok", { id: "Xmax" });
         setStatus("#wsStatus", "status.wsConnected", "ok");
         setStatus("#rtcStatus", "status.rtcJoined", "ok");
+      }
+
+      async function loadReactorClient() {
+        if (!state.reactorModulePromise) {
+          state.reactorModulePromise = import(reactorX2ClientCdnUrl).catch((error) => {
+            state.reactorModulePromise = undefined;
+            throw error;
+          });
+        }
+        return state.reactorModulePromise;
+      }
+
+      async function createReactorToken(apiKey) {
+        const response = await fetch("/api/reactor/token", {
+          method: "POST",
+          headers: {
+            Authorization: apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ durationSeconds: selectedSessionDurationSeconds() }),
+        });
+        return parseJsonResponse(response, "Create Reactor session token");
+      }
+
+      async function reactorReferenceFile(imageValue) {
+        const response = await fetch(imageValue);
+        if (!response.ok) {
+          throw new Error(`Reference image fetch failed: HTTP ${response.status}`);
+        }
+        const blob = await response.blob();
+        if (!blob.type.startsWith("image/")) {
+          throw new Error(t("error.imageRequired"));
+        }
+        const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+        return new File([blob], `reactor-reference.${extension}`, { type: blob.type });
+      }
+
+      function attachReactorRemoteStream(stream) {
+        const key = "camera_reactor";
+        let video = state.remoteVideoElMap.get(key);
+        if (!video) {
+          video = document.createElement("video");
+          video.autoplay = true;
+          video.playsInline = true;
+          video.muted = true;
+          video.dataset.uid = "reactor";
+          remoteVideoContainer.textContent = "";
+          remoteVideoContainer.appendChild(video);
+          state.remoteVideoElMap.set(key, video);
+          const startRecording = () => tryStartRemoteRecording(video);
+          video.addEventListener("loadedmetadata", startRecording, { once: true });
+          video.addEventListener("playing", startRecording, { once: true });
+        }
+        video.srcObject = stream;
+        startTimerOnFirstRemoteFrame(video);
+        video.play().then(() => tryStartRemoteRecording(video)).catch(() => log(t("log.remoteAutoplayFailed")));
+      }
+
+      async function startReactorSession() {
+        const apiKey = stripAuthPrefix($("#authToken").value);
+        if (!apiKey.startsWith("rk_")) throw new Error(t("error.apiKeyRequired"));
+        await waitForActiveSample("");
+        const selectedReferenceImage = activeImageValue("");
+        if (!selectedReferenceImage) throw new Error(t("error.imageRequired"));
+
+        state.activeProvider = "reactor";
+        setStatus("#apiStatus", "status.apiCreating", "warn");
+        setStatus("#wsStatus", "status.wsConnecting", "warn");
+        setStatus("#rtcStatus", "status.rtcJoining", "warn");
+
+        const inputStream = await prepareReactorInputStream();
+        startInputDelayBuffer();
+        const [{ X2Model }, credentials, referenceFile] = await Promise.all([
+          loadReactorClient(),
+          createReactorToken(apiKey),
+          reactorReferenceFile(selectedReferenceImage),
+        ]);
+        const x2 = new X2Model({});
+        const localSessionId = `reactor-${Date.now()}`;
+        state.live = { id: localSessionId };
+        state.reactorSession = x2;
+
+        x2.on("statusChanged", (status) => log("Reactor session state changed", { status }));
+        x2.onMessage((message) => log("Reactor X2 message", message));
+        x2.onMainVideo((track, stream) => {
+          attachReactorRemoteStream(stream || new MediaStream([track]));
+        });
+
+        await x2.connect(credentials.jwt);
+        const reference = await x2.uploadFile(referenceFile);
+        await x2.publishSource(inputStream.getVideoTracks()[0]);
+        await x2.setKeepBacklog({ keep_backlog: isUploadedVideoSelected() });
+        await x2.setReferenceImage({ reference_image: reference });
+        const prompt = xmaxPrompt();
+        await x2.setPrompt({ prompt });
+
+        sessionData.dataset.emptySession = "false";
+        sessionData.textContent = JSON.stringify({
+          provider: "Reactor/XMAX",
+          model: "xmax/x2",
+          mode: selectedEditingType() === "subject_replacement" ? "CharX" : "VibeX",
+          session_id: localSessionId,
+          prompt,
+          reference_image: selectedReferenceImage,
+          token_expires_at: credentials.expires_at,
+        }, null, 2);
+        setStatus("#apiStatus", "status.apiLive", "ok", { id: "Reactor/XMAX" });
+        setStatus("#wsStatus", "status.wsConnected", "ok");
+        setStatus("#rtcStatus", "status.rtcJoined", "ok");
+        setInteractiveEnabled(true);
       }
 
       function buildConnInitSignal() {
@@ -2693,6 +2845,25 @@
       async function sendSwitchPrompt() {
         if (!state.live) {
           showNotice(t("error.liveNotCreated"));
+          return;
+        }
+        if (state.activeProvider === "reactor" && state.reactorSession) {
+          try {
+            await waitForActiveSample("sw");
+            const image = activeImageValue("sw");
+            const editingType = $("#swEditingType").value;
+            clearMediaNotice();
+            if (image) {
+              const referenceFile = await reactorReferenceFile(image);
+              const reference = await state.reactorSession.uploadFile(referenceFile);
+              await state.reactorSession.setReferenceImage({ reference_image: reference });
+            }
+            await state.reactorSession.setPrompt({ prompt: xmaxPrompt(editingType) });
+            setStatus("#wsStatus", "status.wsSwitchSent", "ok");
+            log("Reactor/XMAX prompt updated", { editing_type: editingType, reference_changed: Boolean(image) });
+          } catch (error) {
+            showNotice(error.message || String(error));
+          }
           return;
         }
         const reason = wsReadyError();
@@ -3370,9 +3541,24 @@
         state.xmaxInputStream = undefined;
       }
 
+      async function cleanupReactor() {
+        const session = state.reactorSession;
+        state.reactorSession = undefined;
+        if (session) {
+          try {
+            await session.disconnect();
+          } catch (error) {
+            log("Reactor/XMAX cleanup failed", errorToJson(error));
+          }
+        }
+        state.reactorInputStream?.getTracks().forEach((track) => track.stop());
+        state.reactorInputStream = undefined;
+      }
+
       async function cleanupRtc() {
         cleanupDecart();
         await cleanupXmax();
+        await cleanupReactor();
         for (const key of [...state.remoteVideoElMap.keys()]) {
           const [type, userId] = key.split("_");
           removeRemoteVideo(userId, type);
@@ -3482,6 +3668,8 @@
             await startDecartSession();
           } else if (selectedProvider() === "xmax") {
             await startXmaxSession();
+          } else if (selectedProvider() === "reactor") {
+            await startReactorSession();
           } else {
             state.activeProvider = "vidu";
             await createStream();
