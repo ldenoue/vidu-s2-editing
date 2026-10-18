@@ -4,6 +4,7 @@ const VIDU_ORIGINS = {
 };
 
 const XMAX_TEMPORARY_KEY_URL = "https://api.xmax.ai/open/api/v1/temporary-api-key";
+const XMAX_BALANCE_URL = "https://api.xmax.ai/open/api/v1/points/balance";
 const REACTOR_TOKEN_URL = "https://api.reactor.inc/tokens";
 const REACTOR_X2_MODEL = "xmax/x2";
 
@@ -190,6 +191,50 @@ export async function createXmaxRealtimeKey(request) {
   return json({ temporaryApiKey, expireTimestamp });
 }
 
+export async function getXmaxBalance(request) {
+  const apiKey = apiKeyFrom(request);
+  if (!apiKey.startsWith("uk-")) {
+    return json({ message: "A valid Xmax permanent API key is required" }, 401);
+  }
+
+  let upstream;
+  try {
+    upstream = await fetch(XMAX_BALANCE_URL, {
+      headers: {
+        Accept: "application/json",
+        "X-Api-Key": apiKey,
+      },
+    });
+  } catch {
+    return json({ message: "Could not reach the Xmax API" }, 502);
+  }
+
+  const responseText = await upstream.text();
+  let responsePayload;
+  try {
+    responsePayload = JSON.parse(responseText);
+  } catch {
+    return json({ message: "Xmax returned an invalid response" }, 502);
+  }
+
+  const rawCurrentBalance = responsePayload?.data?.currentBalance;
+  const currentBalance = Number(rawCurrentBalance);
+  if (
+    !upstream.ok
+    || responsePayload?.success !== true
+    || rawCurrentBalance === null
+    || rawCurrentBalance === undefined
+    || !Number.isFinite(currentBalance)
+  ) {
+    const message = typeof responsePayload?.message === "string" && responsePayload.message.trim()
+      ? responsePayload.message.trim()
+      : "Xmax did not return a credit balance";
+    return json({ message }, responsePayload?.code === 46002 ? 401 : 502);
+  }
+
+  return json({ currentBalance });
+}
+
 export async function createReactorToken(request) {
   const apiKey = apiKeyFrom(request);
   if (!apiKey.startsWith("rk_")) {
@@ -276,6 +321,13 @@ export default {
         return json({ message: "Method not allowed" }, 405);
       }
       return createXmaxRealtimeKey(request);
+    }
+
+    if (url.pathname === "/api/xmax/balance") {
+      if (request.method !== "GET") {
+        return json({ message: "Method not allowed" }, 405);
+      }
+      return getXmaxBalance(request);
     }
 
     if (url.pathname === "/api/reactor/token") {

@@ -9,6 +9,7 @@ The Worker serves the page and implements `POST /api/session` for Vidu. Each use
 - Vidu session creation and the WebSocket handshake are forwarded through the Worker; the browser uses the returned short-lived credential for the proxied WebSocket and joins AliRTC directly.
 - Decart uses the official fal.ai browser client for signaling and a peer-to-peer WebRTC media connection to `decart/lucy-2-5/realtime`.
 - Xmax uses the official browser SDK with X2.0. The Worker exchanges the supplied permanent key for a short-lived, credit-limited browser key; CharX handles character replacement and VibeX handles style transfer.
+- For Xmax sessions, the Worker reads the account balance before connecting and after disconnecting so the UI can show elapsed time and credits consumed.
 - Reactor/XMAX uses the official Reactor X2 SDK and WebRTC. The Worker exchanges the supplied `rk_...` key for a five-minute JWT restricted to one `xmax/x2` session; the browser publishes the source track and receives `main_video`.
 
 ## Run locally

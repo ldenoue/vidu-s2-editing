@@ -442,6 +442,10 @@
         background: #eef1f6;
       }
 
+      .effect-segments.has-custom {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
       .provider-segments {
         grid-template-columns: repeat(4, 1fr);
       }
@@ -845,7 +849,7 @@
           </div>
 
           <label data-i18n="field.editingType">编辑效果</label>
-          <div class="effect-segments" role="radiogroup" aria-label="Editing effect">
+          <div id="editingTypeSegments" class="effect-segments" role="radiogroup" aria-label="Editing effect">
             <label>
               <input type="radio" name="editingType" value="style_transfer" checked />
               <span id="editingStyleLabel" data-i18n="editing.style">风格</span>
@@ -854,6 +858,15 @@
               <input type="radio" name="editingType" value="subject_replacement" />
               <span id="editingSubjectLabel" data-i18n="editing.subject">主体</span>
             </label>
+            <label id="xmaxCustomEffectOption" hidden>
+              <input type="radio" name="editingType" value="custom" />
+              <span data-i18n="editing.custom">自定义</span>
+            </label>
+          </div>
+          <div id="xmaxCustomPromptPane" hidden>
+            <label for="xmaxCustomPrompt" data-i18n="field.xmaxCustomPrompt">自定义 Xmax 提示词</label>
+            <textarea id="xmaxCustomPrompt" rows="3" data-i18n-placeholder="field.xmaxCustomPromptPlaceholder" placeholder="Describe the transformation you want Xmax to apply.">视频风格变为参考图指定的风格，不要显示阴影。</textarea>
+            <div class="field-hint" data-i18n="field.xmaxCustomPromptHint">此文本会原样发送到 Xmax。</div>
           </div>
 
           <label for="videoSource" data-i18n="field.videoSource">视频输入</label>
@@ -927,6 +940,10 @@
             <strong data-i18n="section.currentSession">当前会话</strong>
             <pre id="sessionData" data-empty-session="true" data-i18n="session.empty">尚未创建直播流</pre>
           </div>
+          <div id="xmaxUsagePanel" style="margin-top: 12px" hidden>
+            <strong data-i18n="section.xmaxUsage">最近一次 Xmax 会话用量</strong>
+            <pre id="xmaxUsageData"></pre>
+          </div>
         </section>
 
         <section class="card">
@@ -963,6 +980,8 @@
       const switchBtn = $("#switchBtn");
       const eventLog = $("#eventLog");
       const sessionData = $("#sessionData");
+      const xmaxUsagePanel = $("#xmaxUsagePanel");
+      const xmaxUsageData = $("#xmaxUsageData");
       const mediaNotice = $("#mediaNotice");
       const remoteVideoContainer = $("#remoteVideoContainer");
       const localPreviewer = $("#localPreviewer");
@@ -1009,6 +1028,24 @@
         { label: "Somake Anime", path: "sample-characters/somake-anime.jpg" },
         { label: "Low Poly Leo", path: "sample-characters/low-poly-leo.jpeg" },
         { label: "Low Poly Woman", path: "sample-characters/low-poly-woman.jpg" },
+        { label: "Neon Blonde with Glasses", path: "sample-characters/neon-blonde-glasses-woman.jpg" },
+        { label: "Neon Blue Hoodie", path: "sample-characters/neon-blue-hoodie-man.jpg" },
+        { label: "Neon Curly-Haired Dancer", path: "sample-characters/neon-curly-haired-dancer.jpg" },
+        { label: "Neon Blue-Haired Woman", path: "sample-characters/neon-blue-haired-woman.jpg" },
+        { label: "Neon Street Dancer", path: "sample-characters/neon-street-dancer-man.jpg" },
+        { label: "Neon Casual Dancer", path: "sample-characters/neon-casual-dancer-woman.jpg" },
+        { label: "Green Screen Blonde with Glasses", path: "sample-characters/neon-blonde-glasses-woman-green.png" },
+        { label: "Green Screen Blue Hoodie", path: "sample-characters/neon-blue-hoodie-man-green.png" },
+        { label: "Green Screen Curly-Haired Dancer", path: "sample-characters/neon-curly-haired-dancer-green.png" },
+        { label: "Green Screen Blue-Haired Woman", path: "sample-characters/neon-blue-haired-woman-green.png" },
+        { label: "Green Screen Street Dancer", path: "sample-characters/neon-street-dancer-man-green.png" },
+        { label: "Green Screen Casual Dancer", path: "sample-characters/neon-casual-dancer-woman-green.png" },
+        { label: "White Background Blonde with Glasses", path: "sample-characters/neon-blonde-glasses-woman-white.png" },
+        { label: "White Background Blue Hoodie", path: "sample-characters/neon-blue-hoodie-man-white.png" },
+        { label: "White Background Curly-Haired Dancer", path: "sample-characters/neon-curly-haired-dancer-white.png" },
+        { label: "White Background Blue-Haired Woman", path: "sample-characters/neon-blue-haired-woman-white.png" },
+        { label: "White Background Street Dancer", path: "sample-characters/neon-street-dancer-man-white.png" },
+        { label: "White Background Casual Dancer", path: "sample-characters/neon-casual-dancer-woman-white.png" },
       ];
       const translations = {
         zh: {
@@ -1028,6 +1065,9 @@
           "field.referenceImage": "参考图（编辑用，必填）",
           "field.imageDropHint": "或将图片拖放到这里",
           "field.editingType": "编辑效果",
+          "field.xmaxCustomPrompt": "自定义 Xmax 提示词",
+          "field.xmaxCustomPromptPlaceholder": "描述你希望 Xmax 对视频进行的转换。",
+          "field.xmaxCustomPromptHint": "此文本会原样发送到 Xmax。",
           "field.videoSource": "视频输入",
           "field.videoFileHint": "连接后视频会自动循环播放并作为编辑输入；不会使用摄像头或麦克风。",
           "field.enableSegmentation": "移除背景",
@@ -1050,6 +1090,7 @@
           "editing.subject": "主体",
           "editing.vibex": "VibeX 风格",
           "editing.charx": "CharX 角色",
+          "editing.custom": "自定义",
           "editing.backgroundReplacement": "背景替换",
           "tab.imageUrl": "图片 URL",
           "tab.imageFile": "本地选图",
@@ -1061,6 +1102,7 @@
           "button.switchPrompt": "发送 switch_prompt",
           "section.switchPrompt": "更换参考图",
           "section.currentSession": "当前会话",
+          "section.xmaxUsage": "最近一次 Xmax 会话用量",
           "section.eventLog": "事件日志",
           "video.localPreview": "本地预览（编辑输入）",
           "video.renderStream": "实时编辑合成结果（render_uid）",
@@ -1068,6 +1110,12 @@
           "video.xmaxResult": "Xmax 实时编辑结果",
           "video.reactorResult": "Reactor/XMAX 实时编辑结果",
           "session.empty": "尚未创建直播流",
+          "usage.balanceBefore": "开始前积分",
+          "usage.balanceAfter": "结束后积分",
+          "usage.duration": "会话时长",
+          "usage.creditsUsed": "消耗积分",
+          "usage.inProgress": "进行中",
+          "usage.unavailable": "不可用",
           "status.apiIdle": "API idle",
           "status.apiCreating": "API creating",
           "status.apiLive": "API live {id}",
@@ -1092,6 +1140,7 @@
           "device.camera": "摄像头",
           "device.microphone": "麦克风",
           "error.apiKeyRequired": "请先填写 API Key",
+          "error.customPromptRequired": "请输入自定义 Xmax 提示词",
           "error.imageRequired": "请先提供参考图（URL 或本地选图）",
           "error.imageType": "请拖放有效的图片文件",
           "error.imageTooLarge": "本地图片过大（超过 4MB），请换一张或改用图片 URL",
@@ -1151,6 +1200,8 @@
           "log.videoLoaded": "输入视频已加载",
           "log.videoInputReady": "已将上传的视频用作 AliRTC 输入",
           "log.sessionTimerStarted": "收到首个远端视频帧，{durationSeconds} 秒会话计时开始",
+          "log.xmaxUsage": "Xmax 会话用量",
+          "log.xmaxBalanceFailed": "无法读取 Xmax 积分余额",
           "log.segmentationReady": "MediaPipe 背景分割已启用",
           "log.segmentationStopped": "MediaPipe 背景分割已停止",
           "log.recordingStarted": "开始录制输入 / 输出配对画面",
@@ -1175,6 +1226,9 @@
           "field.referenceImage": "Reference image (required)",
           "field.imageDropHint": "or drop an image here",
           "field.editingType": "Effect",
+          "field.xmaxCustomPrompt": "Custom Xmax prompt",
+          "field.xmaxCustomPromptPlaceholder": "Describe the transformation you want Xmax to apply.",
+          "field.xmaxCustomPromptHint": "This text is sent to Xmax exactly as entered.",
           "field.videoSource": "Video input",
           "field.videoFileHint": "The video loops automatically and becomes the editing input after connecting; the camera and microphone are not used.",
           "field.enableSegmentation": "Remove background",
@@ -1197,6 +1251,7 @@
           "editing.subject": "Subject",
           "editing.vibex": "VibeX Style",
           "editing.charx": "CharX Character",
+          "editing.custom": "Custom",
           "editing.backgroundReplacement": "Background replacement",
           "tab.imageUrl": "Image URL",
           "tab.imageFile": "Local file",
@@ -1208,6 +1263,7 @@
           "button.switchPrompt": "Send switch_prompt",
           "section.switchPrompt": "Switch reference image",
           "section.currentSession": "Current Session",
+          "section.xmaxUsage": "Last Xmax session usage",
           "section.eventLog": "Event Log",
           "video.localPreview": "Local Preview (editing input)",
           "video.renderStream": "Live editing result (render_uid)",
@@ -1215,6 +1271,12 @@
           "video.xmaxResult": "Xmax live editing result",
           "video.reactorResult": "Reactor/XMAX live editing result",
           "session.empty": "No live stream created yet",
+          "usage.balanceBefore": "Balance before",
+          "usage.balanceAfter": "Balance after",
+          "usage.duration": "Session duration",
+          "usage.creditsUsed": "Credits used",
+          "usage.inProgress": "In progress",
+          "usage.unavailable": "Unavailable",
           "status.apiIdle": "API idle",
           "status.apiCreating": "API creating",
           "status.apiLive": "API live {id}",
@@ -1239,6 +1301,7 @@
           "device.camera": "Camera",
           "device.microphone": "Microphone",
           "error.apiKeyRequired": "Please enter the API Key first",
+          "error.customPromptRequired": "Enter a custom Xmax prompt",
           "error.imageRequired": "Please provide a reference image (URL or local file)",
           "error.imageType": "Please drop a valid image file",
           "error.imageTooLarge": "Local image is too large (over 4MB); use a smaller one or an image URL",
@@ -1298,6 +1361,8 @@
           "log.videoLoaded": "Input video loaded",
           "log.videoInputReady": "Uploaded video is ready as the AliRTC input",
           "log.sessionTimerStarted": "First remote video frame received; {durationSeconds}-second session timer started",
+          "log.xmaxUsage": "Xmax session usage",
+          "log.xmaxBalanceFailed": "Could not read Xmax credit balance",
           "log.segmentationReady": "MediaPipe background segmentation enabled",
           "log.segmentationStopped": "MediaPipe background segmentation stopped",
           "log.recordingStarted": "Started recording the source/output pair",
@@ -1331,6 +1396,7 @@
         if (sessionData.dataset.emptySession === "true") {
           sessionData.textContent = t("session.empty");
         }
+        renderXmaxUsage();
         const languageSelect = $("#language");
         if (languageSelect) {
           languageSelect.value = state.language;
@@ -1367,6 +1433,8 @@
         xmaxModulePromise: undefined,
         xmaxSession: undefined,
         xmaxInputStream: undefined,
+        xmaxUsage: undefined,
+        xmaxLastUsage: undefined,
         reactorModulePromise: undefined,
         reactorSession: undefined,
         reactorInputStream: undefined,
@@ -1466,11 +1534,22 @@
         return viduApiKeyStorageKey;
       }
 
+      function updateCustomPromptUi() {
+        const isCustomXmax = selectedProvider() === "xmax" && selectedEditingType() === "custom";
+        $("#xmaxCustomPromptPane").hidden = !isCustomXmax;
+      }
+
       function updateProviderUi() {
         const provider = selectedProvider();
         const isDecart = provider === "decart";
         const isXmax = provider === "xmax";
         const isReactor = provider === "reactor";
+        const customEffectInput = document.querySelector('input[name="editingType"][value="custom"]');
+        if (!isXmax && customEffectInput.checked) {
+          document.querySelector('input[name="editingType"][value="style_transfer"]').checked = true;
+        }
+        $("#xmaxCustomEffectOption").hidden = !isXmax;
+        $("#editingTypeSegments").classList.toggle("has-custom", isXmax);
         $("#authTokenLabel").textContent = t(
           isDecart
             ? "field.falApiKey"
@@ -1509,6 +1588,7 @@
         );
         $("#editingStyleLabel").textContent = t(isXmax || isReactor ? "editing.vibex" : "editing.style");
         $("#editingSubjectLabel").textContent = t(isXmax || isReactor ? "editing.charx" : "editing.subject");
+        updateCustomPromptUi();
       }
 
       function restoreApiKey() {
@@ -2461,6 +2541,11 @@
       }
 
       function xmaxPrompt(editingType = selectedEditingType()) {
+        if (editingType === "custom") {
+          const customPrompt = $("#xmaxCustomPrompt").value.trim();
+          if (!customPrompt) throw new Error(t("error.customPromptRequired"));
+          return customPrompt;
+        }
         return editingType === "subject_replacement"
           ? "视频中角色替换成参考图中角色"
           : "视频风格变为参考图指定的风格";
@@ -2476,6 +2561,69 @@
           body: JSON.stringify({ durationSeconds: selectedSessionDurationSeconds() }),
         });
         return parseJsonResponse(response, "Create Xmax temporary key");
+      }
+
+      async function getXmaxBalance(permanentApiKey) {
+        const response = await fetch("/api/xmax/balance", {
+          headers: { Authorization: permanentApiKey },
+          cache: "no-store",
+        });
+        const payload = await parseJsonResponse(response, "Get Xmax balance");
+        const currentBalance = Number(payload?.currentBalance);
+        if (!Number.isFinite(currentBalance)) {
+          throw new Error("Get Xmax balance failed: invalid balance");
+        }
+        return currentBalance;
+      }
+
+      function formatXmaxUsageValue(value) {
+        return Number.isFinite(value)
+          ? value.toLocaleString(undefined, { maximumFractionDigits: 3 })
+          : t("usage.unavailable");
+      }
+
+      function renderXmaxUsage() {
+        const usage = state.xmaxUsage || state.xmaxLastUsage;
+        if (!usage) {
+          xmaxUsagePanel.hidden = true;
+          return;
+        }
+        const isActive = usage === state.xmaxUsage;
+        const duration = Number.isFinite(usage.durationSeconds)
+          ? `${usage.durationSeconds.toFixed(1)} s`
+          : t("usage.inProgress");
+        xmaxUsageData.textContent = [
+          `${t("usage.balanceBefore")}: ${formatXmaxUsageValue(usage.balanceBefore)}`,
+          `${t("usage.balanceAfter")}: ${isActive ? t("usage.inProgress") : formatXmaxUsageValue(usage.balanceAfter)}`,
+          `${t("usage.duration")}: ${duration}`,
+          `${t("usage.creditsUsed")}: ${isActive ? t("usage.inProgress") : formatXmaxUsageValue(usage.creditsUsed)}`,
+        ].join("\n");
+        xmaxUsagePanel.hidden = false;
+      }
+
+      async function readXmaxBalance(permanentApiKey) {
+        try {
+          return await getXmaxBalance(permanentApiKey);
+        } catch (error) {
+          log(t("log.xmaxBalanceFailed"), errorToJson(error));
+          return undefined;
+        }
+      }
+
+      async function readSettledXmaxBalance(usage) {
+        let latestBalance;
+        for (const delayMs of [0, 250, 750, 1500]) {
+          if (delayMs) await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+          latestBalance = await readXmaxBalance(usage.apiKey);
+          if (
+            !Number.isFinite(usage.balanceBefore)
+            || !Number.isFinite(latestBalance)
+            || latestBalance < usage.balanceBefore
+          ) {
+            break;
+          }
+        }
+        return latestBalance;
       }
 
       async function uploadXmaxReferenceImage(client, imageValue) {
@@ -2516,6 +2664,8 @@
       async function startXmaxSession() {
         const permanentApiKey = stripAuthPrefix($("#authToken").value);
         if (!permanentApiKey.startsWith("uk-")) throw new Error(t("error.apiKeyRequired"));
+        const editingType = selectedEditingType();
+        const prompt = xmaxPrompt(editingType);
         await waitForActiveSample("");
         const selectedReferenceImage = activeImageValue("");
         if (!selectedReferenceImage) throw new Error(t("error.imageRequired"));
@@ -2532,8 +2682,14 @@
         ]);
         const client = createXmaxClient({ apiKey: temporaryCredentials.temporaryApiKey });
         const referenceImage = await uploadXmaxReferenceImage(client, selectedReferenceImage);
-        const prompt = xmaxPrompt();
         state.live = { id: `xmax-${Date.now()}` };
+        const balanceBefore = await readXmaxBalance(permanentApiKey);
+        state.xmaxUsage = {
+          apiKey: permanentApiKey,
+          balanceBefore,
+          startedAt: Date.now(),
+        };
+        renderXmaxUsage();
 
         const session = await client.realtime.connect(inputStream, {
           model: models.realtime("x2.0"),
@@ -2557,11 +2713,12 @@
         sessionData.textContent = JSON.stringify({
           provider: "Xmax",
           model: "x2.0",
-          mode: selectedEditingType() === "subject_replacement" ? "CharX" : "VibeX",
+          mode: editingType === "subject_replacement" ? "CharX" : editingType === "custom" ? "Custom" : "VibeX",
           session_id: sessionId,
           prompt,
           reference_image: referenceImage,
           temporary_key_expires_at: temporaryCredentials.expireTimestamp,
+          credits_before: balanceBefore,
         }, null, 2);
         setStatus("#apiStatus", "status.apiLive", "ok", { id: "Xmax" });
         setStatus("#wsStatus", "status.wsConnected", "ok");
@@ -3424,6 +3581,7 @@
         document.querySelectorAll('input[name="editingType"]').forEach((input) => {
           input.disabled = disabled;
         });
+        $("#xmaxCustomPrompt").disabled = disabled;
         document.querySelectorAll('input[name="provider"]').forEach((input) => {
           input.disabled = disabled;
         });
@@ -3529,7 +3687,9 @@
 
       async function cleanupXmax() {
         const session = state.xmaxSession;
+        const usage = state.xmaxUsage;
         state.xmaxSession = undefined;
+        state.xmaxUsage = undefined;
         if (session) {
           try {
             await session.disconnect();
@@ -3539,6 +3699,21 @@
         }
         state.xmaxInputStream?.getTracks().forEach((track) => track.stop());
         state.xmaxInputStream = undefined;
+        if (usage) {
+          const durationSeconds = Math.max(0, (Date.now() - usage.startedAt) / 1000);
+          const balanceAfter = await readSettledXmaxBalance(usage);
+          const creditsUsed = Number.isFinite(usage.balanceBefore) && Number.isFinite(balanceAfter)
+            ? Math.max(0, usage.balanceBefore - balanceAfter)
+            : undefined;
+          state.xmaxLastUsage = {
+            balanceBefore: usage.balanceBefore,
+            balanceAfter,
+            durationSeconds,
+            creditsUsed,
+          };
+          renderXmaxUsage();
+          log(t("log.xmaxUsage"), state.xmaxLastUsage);
+        }
       }
 
       async function cleanupReactor() {
@@ -3643,6 +3818,9 @@
 
       $("#authToken").addEventListener("input", persistApiKey);
       $("#sessionDuration").addEventListener("input", updateSessionDurationOutput);
+      document.querySelectorAll('input[name="editingType"]').forEach((input) => {
+        input.addEventListener("change", updateCustomPromptUi);
+      });
       document.querySelectorAll('input[name="provider"]').forEach((input) => {
         input.addEventListener("change", () => {
           updateProviderUi();

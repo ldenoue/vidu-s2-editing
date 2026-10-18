@@ -4,6 +4,7 @@ import {
   createReactorToken,
   createViduSession,
   createXmaxRealtimeKey,
+  getXmaxBalance,
   proxyViduWebSocket,
 } from "./index.js";
 
@@ -154,6 +155,41 @@ test("rejects malformed Xmax keys and excessive session durations", async () => 
     body: JSON.stringify({ durationSeconds: 300 }),
   }));
   assert.equal(badDurationResponse.status, 400);
+});
+
+test("returns the Xmax credit balance without exposing the permanent key", async () => {
+  let captured;
+  globalThis.fetch = async (url, init) => {
+    captured = { url: String(url), init };
+    return Response.json({ success: true, data: { currentBalance: 1234 } });
+  };
+
+  const response = await getXmaxBalance(new Request("https://example.test/api/xmax/balance", {
+    headers: { Authorization: "Bearer uk-permanent-test-key" },
+  }));
+
+  assert.equal(response.status, 200);
+  assert.equal(captured.url, "https://api.xmax.ai/open/api/v1/points/balance");
+  assert.equal(captured.init.headers["X-Api-Key"], "uk-permanent-test-key");
+  assert.deepEqual(await response.json(), { currentBalance: 1234 });
+});
+
+test("rejects malformed Xmax balance keys and invalid upstream balances", async () => {
+  const badKeyResponse = await getXmaxBalance(new Request("https://example.test/api/xmax/balance", {
+    headers: { Authorization: "tk-not-a-permanent-key" },
+  }));
+  assert.equal(badKeyResponse.status, 401);
+
+  globalThis.fetch = async () => Response.json({
+    success: false,
+    code: 46002,
+    message: "Invalid user API Key",
+  });
+  const invalidUpstreamResponse = await getXmaxBalance(new Request("https://example.test/api/xmax/balance", {
+    headers: { Authorization: "uk-invalid-key" },
+  }));
+  assert.equal(invalidUpstreamResponse.status, 401);
+  assert.deepEqual(await invalidUpstreamResponse.json(), { message: "Invalid user API Key" });
 });
 
 test("exchanges a Reactor key for a tightly scoped X2 browser token", async () => {
