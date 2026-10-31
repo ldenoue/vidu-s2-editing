@@ -999,7 +999,7 @@
         reactor: 500,
       });
       const falClientCdnUrl = "https://cdn.jsdelivr.net/npm/@fal-ai/client@1.10.1/+esm";
-      const xmaxClientCdnUrl = "https://cdn.jsdelivr.net/npm/@xmaxai/sdk-global@1.1.13/+esm";
+      const xmaxClientCdnUrl = "https://cdn.jsdelivr.net/npm/@xmaxai/web-sdk@1.1.1/+esm";
       const reactorX2ClientCdnUrl = "https://cdn.jsdelivr.net/npm/@reactor-models/x2@1.0.0/core/+esm";
       const decartEndpoint = "decart/lucy-2-5/realtime";
 
@@ -1431,7 +1431,12 @@
         decartPeerConnection: undefined,
         decartInputStream: undefined,
         xmaxModulePromise: undefined,
+        xmaxModule: undefined,
+        xmaxClient: undefined,
         xmaxSession: undefined,
+        xmaxSdkInputStream: undefined,
+        xmaxVideoView: undefined,
+        xmaxReferenceImage: undefined,
         xmaxInputStream: undefined,
         xmaxUsage: undefined,
         xmaxLastUsage: undefined,
@@ -2635,28 +2640,35 @@
         }
         const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
         const file = new File([blob], `xmax-reference.${extension}`, { type: blob.type });
-        const upload = await client.files.uploadImage(file);
+        const upload = await client.createStorageService().uploadImage({
+          data: file,
+          fileName: file.name,
+          contentType: file.type,
+        });
         if (!upload?.url) throw new Error("Xmax did not return a reference image URL");
         return upload.url;
       }
 
-      function attachXmaxRemoteStream(stream) {
+      function attachXmaxRemoteTrack(xmaxModule, track) {
         const key = "camera_xmax";
-        let video = state.remoteVideoElMap.get(key);
-        if (!video) {
-          video = document.createElement("video");
-          video.autoplay = true;
-          video.playsInline = true;
-          video.muted = true;
-          video.dataset.uid = "xmax";
-          remoteVideoContainer.textContent = "";
-          remoteVideoContainer.appendChild(video);
-          state.remoteVideoElMap.set(key, video);
-          const startRecording = () => tryStartRemoteRecording(video);
-          video.addEventListener("loadedmetadata", startRecording, { once: true });
-          video.addEventListener("playing", startRecording, { once: true });
-        }
-        video.srcObject = stream;
+        state.xmaxVideoView?.detach();
+        remoteVideoContainer.textContent = "";
+        const view = new xmaxModule.XmaxRealtimeVideoView({
+          videoContentMode: xmaxModule.VideoContentMode.fit,
+        });
+        view.element.style.width = "100%";
+        view.element.style.height = "100%";
+        view.track = track;
+        view.attach(remoteVideoContainer);
+        state.xmaxVideoView = view;
+
+        const video = view.videoElement;
+        if (!video) throw new Error("Xmax did not create a remote video element");
+        video.dataset.uid = "xmax";
+        state.remoteVideoElMap.set(key, video);
+        const startRecording = () => tryStartRemoteRecording(video);
+        video.addEventListener("loadedmetadata", startRecording, { once: true });
+        video.addEventListener("playing", startRecording, { once: true });
         startTimerOnFirstRemoteFrame(video);
         video.play().then(() => tryStartRemoteRecording(video)).catch(() => log(t("log.remoteAutoplayFailed")));
       }
@@ -2676,12 +2688,25 @@
         setStatus("#rtcStatus", "status.rtcJoining", "warn");
         const inputStream = await prepareXmaxInputStream();
         startInputDelayBuffer();
-        const [{ createXmaxClient, models }, temporaryCredentials] = await Promise.all([
+        const [xmaxModule, temporaryCredentials] = await Promise.all([
           loadXmaxClient(),
           createXmaxTemporaryKey(permanentApiKey),
         ]);
-        const client = createXmaxClient({ apiKey: temporaryCredentials.temporaryApiKey });
+        const {
+          RealtimeConfiguration,
+          RealtimeContext,
+          RealtimeModel,
+          RealtimeVideoFormat,
+          XmaxClient,
+          XmaxConfiguration,
+          XmaxEnvironment,
+        } = xmaxModule;
+        const client = new XmaxClient(new XmaxConfiguration({
+          apiKey: temporaryCredentials.temporaryApiKey,
+          environment: XmaxEnvironment.global,
+        }));
         const referenceImage = await uploadXmaxReferenceImage(client, selectedReferenceImage);
+        state.xmaxReferenceImage = referenceImage;
         state.live = { id: `xmax-${Date.now()}` };
         const balanceBefore = await readXmaxBalance(permanentApiKey);
         state.xmaxUsage = {
@@ -2691,28 +2716,48 @@
         };
         renderXmaxUsage();
 
-        const session = await client.realtime.connect(inputStream, {
-          model: models.realtime("x2.0"),
-          context: { prompt, refImageUrl: referenceImage },
-          audio: { publish: false, subscribe: false },
-          autoStart: true,
-          onRemoteStream: attachXmaxRemoteStream,
-          onStateChange: (sessionState) => log("Xmax session state changed", { state: sessionState }),
-          onNotice: (notice) => log("Xmax session notice", notice),
-          onDisconnect: (reason, details) => log("Xmax session disconnected", { reason, details }),
-          onError: (message, error) => log("Xmax session error", {
-            message,
-            code: error?.code,
-            details: error?.details,
+        const manager = client.createRealtimeManager(new RealtimeConfiguration({
+          model: RealtimeModel.x2_1,
+        }));
+        state.xmaxModule = xmaxModule;
+        state.xmaxClient = client;
+        state.xmaxSession = manager;
+        let latestState;
+        await manager.setStateListener((sessionState) => {
+          latestState = sessionState;
+          if (sessionState.sessionID) state.live = { id: sessionState.sessionID };
+          log("Xmax session state changed", {
+            state: sessionState.connectionState,
+            session_id: sessionState.sessionID,
+            task_id: sessionState.taskID,
+            reason: sessionState.reason,
+          });
+        });
+
+        const inputTrack = inputStream.getVideoTracks()[0];
+        const inputSettings = inputTrack.getSettings();
+        const sdkInputStream = await manager.createExternalVideoStream({
+          videoTrack: inputTrack,
+          videoFormat: new RealtimeVideoFormat({
+            width: inputSettings.width || localPreviewer.videoWidth || 1280,
+            height: inputSettings.height || localPreviewer.videoHeight || 720,
+            fps: inputSettings.frameRate || 30,
           }),
         });
-        state.xmaxSession = session;
-        const sessionId = session.getSessionUid?.() || state.live.id;
+        const remoteStream = await manager.startGeneration({
+          localStream: sdkInputStream,
+          context: new RealtimeContext({ prompt, referencePath: referenceImage }),
+        });
+        if (!remoteStream.videoTrack) throw new Error("Xmax did not return a remote video track");
+        attachXmaxRemoteTrack(xmaxModule, remoteStream.videoTrack);
+
+        state.xmaxSdkInputStream = sdkInputStream;
+        const sessionId = latestState?.sessionID || state.live.id;
         state.live = { id: sessionId };
         sessionData.dataset.emptySession = "false";
         sessionData.textContent = JSON.stringify({
           provider: "Xmax",
-          model: "x2.0",
+          model: "x2.1",
           mode: editingType === "subject_replacement" ? "CharX" : editingType === "custom" ? "Custom" : "VibeX",
           session_id: sessionId,
           prompt,
@@ -2723,6 +2768,7 @@
         setStatus("#apiStatus", "status.apiLive", "ok", { id: "Xmax" });
         setStatus("#wsStatus", "status.wsConnected", "ok");
         setStatus("#rtcStatus", "status.rtcJoined", "ok");
+        setInteractiveEnabled(true);
       }
 
       async function loadReactorClient() {
@@ -3018,6 +3064,32 @@
             await state.reactorSession.setPrompt({ prompt: xmaxPrompt(editingType) });
             setStatus("#wsStatus", "status.wsSwitchSent", "ok");
             log("Reactor/XMAX prompt updated", { editing_type: editingType, reference_changed: Boolean(image) });
+          } catch (error) {
+            showNotice(error.message || String(error));
+          }
+          return;
+        }
+        if (state.activeProvider === "xmax" && state.xmaxSession) {
+          try {
+            await waitForActiveSample("sw");
+            const image = activeImageValue("sw");
+            const editingType = $("#swEditingType").value;
+            clearMediaNotice();
+            if (image) {
+              state.xmaxReferenceImage = await uploadXmaxReferenceImage(state.xmaxClient, image);
+            }
+            const remoteStream = await state.xmaxSession.startGeneration({
+              localStream: state.xmaxSdkInputStream,
+              context: new state.xmaxModule.RealtimeContext({
+                prompt: xmaxPrompt(editingType),
+                referencePath: state.xmaxReferenceImage,
+              }),
+            });
+            if (remoteStream.videoTrack) {
+              attachXmaxRemoteTrack(state.xmaxModule, remoteStream.videoTrack);
+            }
+            setStatus("#wsStatus", "status.wsSwitchSent", "ok");
+            log("Xmax prompt updated", { editing_type: editingType, reference_changed: Boolean(image) });
           } catch (error) {
             showNotice(error.message || String(error));
           }
@@ -3689,14 +3761,21 @@
         const session = state.xmaxSession;
         const usage = state.xmaxUsage;
         state.xmaxSession = undefined;
+        state.xmaxSdkInputStream = undefined;
+        state.xmaxClient = undefined;
+        state.xmaxModule = undefined;
+        state.xmaxReferenceImage = undefined;
         state.xmaxUsage = undefined;
         if (session) {
           try {
-            await session.disconnect();
+            await session.close();
           } catch (error) {
             log("Xmax cleanup failed", errorToJson(error));
           }
         }
+        state.xmaxVideoView?.detach();
+        state.xmaxVideoView = undefined;
+        state.remoteVideoElMap.delete("camera_xmax");
         state.xmaxInputStream?.getTracks().forEach((track) => track.stop());
         state.xmaxInputStream = undefined;
         if (usage) {
