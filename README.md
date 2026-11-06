@@ -1,6 +1,6 @@
 # Realtime Video Editing Demo
 
-A Cloudflare Worker-hosted browser demo for Vidu S2, Decart Lucy 2.5, Xmax X2.1, and XMAX X2 through Reactor live video editing. It can send a webcam or uploaded video, preview optional WebGPU selfie segmentation, select bundled character images, and save an unlabeled side-by-side MP4 containing only the source and generated output for downstream model training.
+A Cloudflare Worker-hosted browser demo for Vidu S2, Decart Lucy 2.5, Xmax X2.1, XMAX X2 through Reactor, and Reactor EdenLive live video editing. It can send a webcam or uploaded video, preview optional WebGPU selfie segmentation, select bundled character images, and save an unlabeled side-by-side MP4 containing only the source and generated output for downstream model training.
 
 ## Architecture
 
@@ -11,6 +11,7 @@ The Worker serves the page and implements `POST /api/session` for Vidu. Each use
 - Xmax uses the official `@xmaxai/web-sdk` with X2.1 over its Agora transport. The Worker exchanges the supplied permanent key for a short-lived, credit-limited browser key; CharX handles character replacement and VibeX handles style transfer.
 - For Xmax sessions, the Worker reads the account balance before connecting and after disconnecting so the UI can show elapsed time and credits consumed.
 - Reactor/XMAX uses the official Reactor X2 SDK and WebRTC. The Worker exchanges the supplied `rk_...` key for a five-minute JWT restricted to one `xmax/x2` session; the browser publishes the source track and receives `main_video`.
+- EdenLive uses the official Reactor EdenLive SDK and the same stored Reactor key. Its JWT is restricted to one `reactor/eden-live` session; the browser publishes `source_video`, stages the selected reference image and prompt, and receives `main_video`.
 
 ## Run locally
 
@@ -44,7 +45,7 @@ Cloudflare serves everything in `public/` and runs `worker/index.js` first for A
 - The Worker does not log, persist, or bundle Vidu API keys; it only forwards a supplied key during session creation.
 - The subsequent browser WebSocket proxy uses Vidu's short-lived `client_secret`, not the API key.
 - The Worker uses an Xmax permanent key only to issue a bounded temporary key and returns only that temporary credential to the browser.
-- The Worker uses a Reactor key only to mint a short-lived JWT scoped to one `xmax/x2` session and returns only that JWT to the browser. Reactor recommends keeping permanent keys server-side in production; browser entry is retained here to match this demo's bring-your-own-key workflow.
+- The Worker uses a Reactor key only to mint a short-lived JWT scoped to the selected `xmax/x2` or `reactor/eden-live` session and returns only that JWT to the browser. Reactor recommends keeping permanent keys server-side in production; browser entry is retained here to match this demo's bring-your-own-key workflow.
 - Never add a real API key to source code, screenshots, issues, or commits.
 - If a key is ever committed, revoke it immediately and remove it from Git history.
 

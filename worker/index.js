@@ -6,7 +6,7 @@ const VIDU_ORIGINS = {
 const XMAX_TEMPORARY_KEY_URL = "https://api.xmax.ai/open/api/v1/temporary-api-key";
 const XMAX_BALANCE_URL = "https://api.xmax.ai/open/api/v1/points/balance";
 const REACTOR_TOKEN_URL = "https://api.reactor.inc/tokens";
-const REACTOR_X2_MODEL = "xmax/x2";
+const REACTOR_MODELS = new Set(["xmax/x2", "reactor/eden-live"]);
 
 const EDITING_TYPES = new Set([
   "style_transfer",
@@ -251,6 +251,10 @@ export async function createReactorToken(request) {
   if (!Number.isFinite(requestedDuration) || requestedDuration < 5 || requestedDuration > 30) {
     return json({ message: "durationSeconds must be between 5 and 30" }, 400);
   }
+  const model = payload?.model || "xmax/x2";
+  if (!REACTOR_MODELS.has(model)) {
+    return json({ message: "Unsupported Reactor model" }, 400);
+  }
 
   let upstream;
   try {
@@ -264,7 +268,7 @@ export async function createReactorToken(request) {
         expires_after: 300,
         authorization_details: [{
           type: "session",
-          resources: { models: { match: [REACTOR_X2_MODEL] } },
+          resources: { models: { match: [model] } },
           constraints: {
             max_sessions: 1,
             // Leave room for model startup before the browser's output timer starts.

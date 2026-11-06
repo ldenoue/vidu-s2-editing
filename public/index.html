@@ -447,7 +447,7 @@
       }
 
       .provider-segments {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
       }
 
       .effect-segments label {
@@ -787,6 +787,10 @@
         .video-grid {
           grid-template-columns: 1fr;
         }
+
+        .provider-segments {
+          grid-template-columns: repeat(3, 1fr);
+        }
       }
     </style>
   </head>
@@ -823,6 +827,10 @@
             <label>
               <input type="radio" name="provider" value="reactor" />
               <span>Reactor/XMAX</span>
+            </label>
+            <label>
+              <input type="radio" name="provider" value="eden" />
+              <span>EdenLive</span>
             </label>
           </div>
 
@@ -997,10 +1005,12 @@
         vidu: 1_050,
         xmax: 500,
         reactor: 500,
+        eden: 500,
       });
       const falClientCdnUrl = "https://cdn.jsdelivr.net/npm/@fal-ai/client@1.10.1/+esm";
       const xmaxClientCdnUrl = "https://cdn.jsdelivr.net/npm/@xmaxai/web-sdk@1.1.1/+esm";
       const reactorX2ClientCdnUrl = "https://cdn.jsdelivr.net/npm/@reactor-models/x2@1.0.0/core/+esm";
+      const edenLiveClientCdnUrl = "https://cdn.jsdelivr.net/npm/@reactor-models/eden-live@2.1.4/core/+esm";
       const decartEndpoint = "decart/lucy-2-5/realtime";
 
       const fallbackLanguage = "zh";
@@ -1050,7 +1060,7 @@
       const translations = {
         zh: {
           "page.title": "实时编辑直播流 Demo",
-          "page.hint": "选择 Vidu、Decart、Xmax 或 Reactor/XMAX，将摄像头或循环视频实时转换并保存无标签的输入 / 输出训练配对。Cloudflare Worker 会代理需要服务端凭证的步骤；浏览器只在实时连接中使用短期凭证。",
+          "page.hint": "选择 Vidu、Decart、Xmax、Reactor/XMAX 或 EdenLive，将摄像头或循环视频实时转换并保存无标签的输入 / 输出训练配对。Cloudflare Worker 会代理需要服务端凭证的步骤；浏览器只在实时连接中使用短期凭证。",
           "language.label": "语言",
           "environment.cn": "国内",
           "environment.ovs": "海外",
@@ -1077,6 +1087,7 @@
           "field.decartSyncComparisonRecordingHint": "Decart 使用低延迟 WebRTC，不应用 Vidu 的输入延迟。",
           "field.xmaxSyncComparisonRecordingHint": "将保存视频中的 Xmax 输入延迟约 0.5 秒。",
           "field.reactorSyncComparisonRecordingHint": "将保存视频中的 Reactor/XMAX 输入延迟约 0.5 秒。",
+          "field.edenSyncComparisonRecordingHint": "将保存视频中的 EdenLive 输入延迟约 0.5 秒。",
           "field.maxDuration": "最长时长",
           "videoSource.camera": "摄像头 + 麦克风",
           "videoSource.file": "上传的视频",
@@ -1109,6 +1120,7 @@
           "video.decartResult": "Decart 实时编辑结果",
           "video.xmaxResult": "Xmax 实时编辑结果",
           "video.reactorResult": "Reactor/XMAX 实时编辑结果",
+          "video.edenResult": "EdenLive 实时编辑结果",
           "session.empty": "尚未创建直播流",
           "usage.balanceBefore": "开始前积分",
           "usage.balanceAfter": "结束后积分",
@@ -1211,7 +1223,7 @@
         },
         en: {
           "page.title": "Live Editing Stream Demo",
-          "page.hint": "Choose Vidu, Decart, Xmax, or Reactor/XMAX to transform a camera or looping video in real time and save an unlabeled source/output training pair. The Cloudflare Worker proxies steps that require server credentials; the browser uses only short-lived credentials for realtime connections.",
+          "page.hint": "Choose Vidu, Decart, Xmax, Reactor/XMAX, or EdenLive to transform a camera or looping video in real time and save an unlabeled source/output training pair. The Cloudflare Worker proxies steps that require server credentials; the browser uses only short-lived credentials for realtime connections.",
           "language.label": "Language",
           "environment.cn": "China",
           "environment.ovs": "Global",
@@ -1238,6 +1250,7 @@
           "field.decartSyncComparisonRecordingHint": "Decart uses low-latency WebRTC; the Vidu input delay is not applied.",
           "field.xmaxSyncComparisonRecordingHint": "Delays the saved Xmax input by about 0.5 seconds.",
           "field.reactorSyncComparisonRecordingHint": "Delays the saved Reactor/XMAX input by about 0.5 seconds.",
+          "field.edenSyncComparisonRecordingHint": "Delays the saved EdenLive input by about 0.5 seconds.",
           "field.maxDuration": "Max duration",
           "videoSource.camera": "Camera + microphone",
           "videoSource.file": "Uploaded video",
@@ -1270,6 +1283,7 @@
           "video.decartResult": "Decart live editing result",
           "video.xmaxResult": "Xmax live editing result",
           "video.reactorResult": "Reactor/XMAX live editing result",
+          "video.edenResult": "EdenLive live editing result",
           "session.empty": "No live stream created yet",
           "usage.balanceBefore": "Balance before",
           "usage.balanceAfter": "Balance after",
@@ -1441,6 +1455,7 @@
         xmaxUsage: undefined,
         xmaxLastUsage: undefined,
         reactorModulePromise: undefined,
+        edenModulePromise: undefined,
         reactorSession: undefined,
         reactorInputStream: undefined,
         remoteVideoElMap: new Map(),
@@ -1535,7 +1550,7 @@
       function selectedApiKeyStorageKey() {
         if (selectedProvider() === "decart") return falApiKeyStorageKey;
         if (selectedProvider() === "xmax") return xmaxApiKeyStorageKey;
-        if (selectedProvider() === "reactor") return reactorApiKeyStorageKey;
+        if (selectedProvider() === "reactor" || selectedProvider() === "eden") return reactorApiKeyStorageKey;
         return viduApiKeyStorageKey;
       }
 
@@ -1549,6 +1564,8 @@
         const isDecart = provider === "decart";
         const isXmax = provider === "xmax";
         const isReactor = provider === "reactor";
+        const isEden = provider === "eden";
+        const usesReactorKey = isReactor || isEden;
         const customEffectInput = document.querySelector('input[name="editingType"][value="custom"]');
         if (!isXmax && customEffectInput.checked) {
           document.querySelector('input[name="editingType"][value="style_transfer"]').checked = true;
@@ -1560,7 +1577,7 @@
             ? "field.falApiKey"
             : isXmax
               ? "field.xmaxApiKey"
-              : isReactor
+              : usesReactorKey
                 ? "field.reactorApiKey"
                 : "field.viduApiKey",
         );
@@ -1568,7 +1585,7 @@
           ? "fal key"
           : isXmax
             ? "uk-..."
-            : isReactor
+            : usesReactorKey
               ? "rk_..."
               : "vda_...";
         $("#apiKeyHint").textContent = t("field.apiKeyHint");
@@ -1580,7 +1597,9 @@
               ? "field.xmaxSyncComparisonRecordingHint"
               : isReactor
                 ? "field.reactorSyncComparisonRecordingHint"
-              : "field.syncComparisonRecordingHint",
+                : isEden
+                  ? "field.edenSyncComparisonRecordingHint"
+                  : "field.syncComparisonRecordingHint",
         );
         $("#remoteVideoTitle").textContent = t(
           isDecart
@@ -1589,7 +1608,9 @@
               ? "video.xmaxResult"
               : isReactor
                 ? "video.reactorResult"
-                : "video.renderStream",
+                : isEden
+                  ? "video.edenResult"
+                  : "video.renderStream",
         );
         $("#editingStyleLabel").textContent = t(isXmax || isReactor ? "editing.vibex" : "editing.style");
         $("#editingSubjectLabel").textContent = t(isXmax || isReactor ? "editing.charx" : "editing.subject");
@@ -2781,14 +2802,24 @@
         return state.reactorModulePromise;
       }
 
-      async function createReactorToken(apiKey) {
+      async function loadEdenClient() {
+        if (!state.edenModulePromise) {
+          state.edenModulePromise = import(edenLiveClientCdnUrl).catch((error) => {
+            state.edenModulePromise = undefined;
+            throw error;
+          });
+        }
+        return state.edenModulePromise;
+      }
+
+      async function createReactorToken(apiKey, model = "xmax/x2") {
         const response = await fetch("/api/reactor/token", {
           method: "POST",
           headers: {
             Authorization: apiKey,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ durationSeconds: selectedSessionDurationSeconds() }),
+          body: JSON.stringify({ durationSeconds: selectedSessionDurationSeconds(), model }),
         });
         return parseJsonResponse(response, "Create Reactor session token");
       }
@@ -2807,14 +2838,15 @@
       }
 
       function attachReactorRemoteStream(stream) {
-        const key = "camera_reactor";
+        const provider = state.activeProvider === "eden" ? "eden" : "reactor";
+        const key = `camera_${provider}`;
         let video = state.remoteVideoElMap.get(key);
         if (!video) {
           video = document.createElement("video");
           video.autoplay = true;
           video.playsInline = true;
           video.muted = true;
-          video.dataset.uid = "reactor";
+          video.dataset.uid = provider;
           remoteVideoContainer.textContent = "";
           remoteVideoContainer.appendChild(video);
           state.remoteVideoElMap.set(key, video);
@@ -2876,6 +2908,62 @@
           token_expires_at: credentials.expires_at,
         }, null, 2);
         setStatus("#apiStatus", "status.apiLive", "ok", { id: "Reactor/XMAX" });
+        setStatus("#wsStatus", "status.wsConnected", "ok");
+        setStatus("#rtcStatus", "status.rtcJoined", "ok");
+        setInteractiveEnabled(true);
+      }
+
+      async function startEdenSession() {
+        const apiKey = stripAuthPrefix($("#authToken").value);
+        if (!apiKey.startsWith("rk_")) throw new Error(t("error.apiKeyRequired"));
+        await waitForActiveSample("");
+        const selectedReferenceImage = activeImageValue("");
+        if (!selectedReferenceImage) throw new Error(t("error.imageRequired"));
+
+        state.activeProvider = "eden";
+        setStatus("#apiStatus", "status.apiCreating", "warn");
+        setStatus("#wsStatus", "status.wsConnecting", "warn");
+        setStatus("#rtcStatus", "status.rtcJoining", "warn");
+
+        const inputStream = await prepareReactorInputStream();
+        startInputDelayBuffer();
+        const [{ EdenLiveModel }, credentials, referenceFile] = await Promise.all([
+          loadEdenClient(),
+          createReactorToken(apiKey, "reactor/eden-live"),
+          reactorReferenceFile(selectedReferenceImage),
+        ]);
+        const eden = new EdenLiveModel();
+        const localSessionId = `eden-${Date.now()}`;
+        state.live = { id: localSessionId };
+        state.reactorSession = eden;
+
+        eden.on("statusChanged", (status) => log("EdenLive session state changed", { status }));
+        eden.on("error", (error) => log("EdenLive SDK error", error));
+        eden.onMessage((message) => log("EdenLive message", message));
+        eden.onMainVideo((track, stream) => {
+          attachReactorRemoteStream(stream || new MediaStream([track]));
+        });
+
+        await eden.connect(credentials.jwt);
+        const reference = await eden.uploadFile(referenceFile);
+        await eden.publishSourceVideo(inputStream.getVideoTracks()[0]);
+        await eden.setSource({ source: "client" });
+        await eden.setPaused({ paused: true });
+        await eden.setImage({ image: reference });
+        const prompt = xmaxPrompt();
+        await eden.setPrompt({ prompt });
+        await eden.start({});
+
+        sessionData.dataset.emptySession = "false";
+        sessionData.textContent = JSON.stringify({
+          provider: "Reactor/EdenLive",
+          model: "reactor/eden-live",
+          session_id: localSessionId,
+          prompt,
+          reference_image: selectedReferenceImage,
+          token_expires_at: credentials.expires_at,
+        }, null, 2);
+        setStatus("#apiStatus", "status.apiLive", "ok", { id: "EdenLive" });
         setStatus("#wsStatus", "status.wsConnected", "ok");
         setStatus("#rtcStatus", "status.rtcJoined", "ok");
         setInteractiveEnabled(true);
@@ -3048,6 +3136,28 @@
       async function sendSwitchPrompt() {
         if (!state.live) {
           showNotice(t("error.liveNotCreated"));
+          return;
+        }
+        if (state.activeProvider === "eden" && state.reactorSession) {
+          try {
+            await waitForActiveSample("sw");
+            const image = activeImageValue("sw");
+            const editingType = $("#swEditingType").value;
+            const prompt = xmaxPrompt(editingType);
+            clearMediaNotice();
+            if (image) {
+              await state.reactorSession.setPaused({ paused: true });
+              const referenceFile = await reactorReferenceFile(image);
+              const reference = await state.reactorSession.uploadFile(referenceFile);
+              await state.reactorSession.setImage({ image: reference });
+            }
+            await state.reactorSession.setPrompt({ prompt });
+            if (image) await state.reactorSession.start({});
+            setStatus("#wsStatus", "status.wsSwitchSent", "ok");
+            log("EdenLive prompt updated", { editing_type: editingType, reference_changed: Boolean(image) });
+          } catch (error) {
+            showNotice(error.message || String(error));
+          }
           return;
         }
         if (state.activeProvider === "reactor" && state.reactorSession) {
@@ -3797,12 +3907,13 @@
 
       async function cleanupReactor() {
         const session = state.reactorSession;
+        const provider = state.activeProvider;
         state.reactorSession = undefined;
         if (session) {
           try {
             await session.disconnect();
           } catch (error) {
-            log("Reactor/XMAX cleanup failed", errorToJson(error));
+            log(`${provider === "eden" ? "EdenLive" : "Reactor/XMAX"} cleanup failed`, errorToJson(error));
           }
         }
         state.reactorInputStream?.getTracks().forEach((track) => track.stop());
@@ -3927,6 +4038,8 @@
             await startXmaxSession();
           } else if (selectedProvider() === "reactor") {
             await startReactorSession();
+          } else if (selectedProvider() === "eden") {
+            await startEdenSession();
           } else {
             state.activeProvider = "vidu";
             await createStream();

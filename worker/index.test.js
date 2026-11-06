@@ -226,12 +226,35 @@ test("exchanges a Reactor key for a tightly scoped X2 browser token", async () =
 });
 
 test("requires a Reactor key and validates requested duration", async () => {
-  const request = (durationSeconds, authorization = "") => new Request("https://example.test/api/reactor/token", {
+  const request = (durationSeconds, authorization = "", model) => new Request("https://example.test/api/reactor/token", {
     method: "POST",
     headers: { Authorization: authorization, "Content-Type": "application/json" },
-    body: JSON.stringify({ durationSeconds }),
+    body: JSON.stringify({ durationSeconds, model }),
   });
 
   assert.equal((await createReactorToken(request(10))).status, 401);
   assert.equal((await createReactorToken(request(31, "rk_user-test-key"))).status, 400);
+  assert.equal((await createReactorToken(request(10, "rk_user-test-key", "reactor/not-allowed"))).status, 400);
+});
+
+test("scopes an EdenLive browser token to reactor/eden-live", async () => {
+  let tokenRequest;
+  globalThis.fetch = async (_url, init) => {
+    tokenRequest = JSON.parse(init.body);
+    return Response.json({ jwt: "eden-live-jwt" });
+  };
+
+  const response = await createReactorToken(new Request("https://example.test/api/reactor/token", {
+    method: "POST",
+    headers: {
+      Authorization: "rk_user-test-key",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ durationSeconds: 20, model: "reactor/eden-live" }),
+  }));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(tokenRequest.authorization_details[0].resources, {
+    models: { match: ["reactor/eden-live"] },
+  });
 });
